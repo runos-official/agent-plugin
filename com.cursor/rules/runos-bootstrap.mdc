@@ -1,0 +1,50 @@
+---
+description: How to open a RunOS session. Apply before the first RunOS MCP tool call in a conversation, and whenever a RunOS tool refuses a call. Covers the bootstrap gate, the two-document gate, and the rule against answering from memory.
+globs:
+alwaysApply: false
+---
+
+# Opening a RunOS session
+
+Do these three calls before any other RunOS tool. They are cheap. Skipping them
+costs a refused call and a wasted turn.
+
+1. `mcp_bootstrap`. Call it once per RunOS server per session. It returns the
+   instructions and the index of documentation topic keys.
+2. One `mcp_topics_show`, with an exact key from that index. Pick the topic that
+   matches the task.
+3. `cli_version-check`. Tell the user if their CLI is behind.
+
+## Why step 2 is not optional
+
+The RunOS read server refuses its tools until two documents have been read.
+`mcp_bootstrap` counts as one. Each `mcp_topics_show` counts as one.
+`mcp_topics_search` finds keys but **does not count**, so a search alone leaves you
+still gated.
+
+Search when you do not know the key. Then show the topic. The show is the one that
+satisfies the gate.
+
+## Never state a RunOS fact from memory
+
+Every fact about RunOS comes from a topic or from a tool result. That includes
+service types, size and class names, field names, file names, environment variable
+names, command names and URLs.
+
+If you cannot fetch the topic, say so and stop. Do not fill the gap from a similar
+platform and do not reason from a config file you found in the repository. A
+plausible wrong value is worse than an admitted gap, because the user cannot see it
+is wrong.
+
+## When a tool refuses
+
+Read the `code` field of the error, never the prose.
+
+If the refusal says `not authenticated`, tell the user to run `runos login` in their
+terminal and wait. In a headless or background agent there is no browser, so the
+route is the `RUNOS_API_KEY` environment variable instead. Do not retry.
+
+If a tool you expect is missing, or refuses an argument the topic says it takes,
+call `manifest_update` and try once more.
+
+For the full call contract, read the `cli-mcp-contract` topic.

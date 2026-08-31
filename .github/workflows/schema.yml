@@ -1,0 +1,64 @@
+name: Manifests
+
+# Validate the plugin against the PUBLISHED Agent Plugins 1.0.0 schemas on
+# every push and every pull request.
+#
+# WHY IT FETCHES THE SCHEMAS INSTEAD OF VENDORING THEM
+# The specification pins a canonical identifier per version and states that a
+# published identifier MUST NOT be reassigned to different contents (spec
+# 10.1). Fetching therefore cannot drift, and a vendored copy could. Clients
+# are forbidden from fetching a schema while LOADING a plugin, which is a
+# runtime rule, not a rule about this build step.
+#
+# The job installs jsonschema itself so scripts/validate_manifests.py takes its
+# already-importable path and never builds its local .venv fallback here.
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  manifests:
+    name: Agent Plugins 1.0.0
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - uses: actions/setup-python@a26af69be951a213d495a4c3e4e4022e16d87065 # v5
+        with:
+          python-version: '3.12'
+
+      - name: Install the JSON Schema validator
+        run: python3 -m pip install --quiet jsonschema
+
+      # Validates plugin.json and mcp.json against the published 1.0.0 schemas,
+      # then applies the specification rules the schemas cannot express.
+      - name: Validate the manifests
+        run: python3 scripts/validate_manifests.py
+
+      # The launchers are what every MCP server in mcp.json actually starts.
+      # A syntax error here is a plugin that installs and then does nothing.
+      - name: Check the POSIX launcher parses
+        run: sh -n bin/runos-mcp
+
+      - name: Check the launchers are executable
+        run: |
+          test -x bin/runos-mcp || { echo "bin/runos-mcp is not executable"; exit 1; }
+          echo "bin/runos-mcp is executable"
+
+      # A plugin-relative command must resolve for a user who never had the
+      # RunOS CLI on PATH. Proves the launcher reports a real install command
+      # and exits non-zero rather than hanging a client on a dead stdio pipe.
+      - name: The launcher must fail usefully when no binary resolves
+        run: |
+          set +e
+          OUT="$(env -u RUNOS_BIN PATH=/usr/bin:/bin HOME="$(mktemp -d)" ./bin/runos-mcp mcp serve read 2>&1 1>/dev/null)"
+          CODE=$?
+          set -e
+          echo "$OUT"
+          test "$CODE" -ne 0 || { echo "expected a non-zero exit"; exit 1; }
+          echo "$OUT" | grep -q "get.runos.com" || { echo "stderr did not name the install command"; exit 1; }
+          echo "launcher failed correctly with exit $CODE"

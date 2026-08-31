@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "beforeMCPExecution": [
+      { "command": "./sensitive-guard.sh" }
+    ],
+    "sessionStart": [
+      { "command": "./binary-check.sh" }
+    ]
+  }
+}

@@ -1,0 +1,61 @@
+#!/usr/bin/env bash
+#
+# RunOS pre-commit hook: keep internal identifiers and credentials out of this
+# PUBLIC repo. The checker it calls, scripts/leakcheck.py, is byte-identical in
+# every public RunOS repo.
+#
+# It is TRACKED, because .git/hooks is not. A hook that lives only in one clone
+# is a hook nobody has. Install it once per clone with:
+#
+#     make hooks          (or: git config core.hooksPath .githooks)
+#
+# It scans ONLY the staged diff, so it stays fast, and it is the FIRST of two
+# run points in this repo, not the last one:
+#
+#   1. this hook                          opt-in, skippable, fast
+#   2. .github/workflows/leakcheck.yml    every push and every pull request,
+#                                         whole tree, cannot be skipped
+#
+# The checker's own header names a third run point, scripts/release.sh. That
+# is the binary-shipping repos. This repo ships no binary and cuts no release
+# tags, so it has no release script and run point 2 is the last gate.
+#
+# A fresh clone has core.hooksPath unset, so it has no hook at all until
+# somebody runs `make hooks`. Run point 2 is what actually holds the line.
+#
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+CHECKER="$REPO_ROOT/scripts/leakcheck.py"
+
+[[ -f "$CHECKER" ]] || exit 0
+
+if ! command -v python3 >/dev/null 2>&1; then
+  printf '\033[0;33m  !\033[0m pre-commit: python3 not found, leakcheck skipped. CI still runs it.\n' >&2
+  exit 0
+fi
+
+if OUTPUT="$(python3 "$CHECKER" --staged 2>&1)"; then
+  exit 0
+fi
+printf '%s\n' "$OUTPUT" >&2
+
+cat >&2 <<'MSG'
+
+  --------------------------------------------------------------------------
+  COMMIT BLOCKED by leakcheck. This is a PUBLIC repo.
+
+  Fix the lines above. Do not hand-add them to scripts/leakcheck.baseline:
+  that file records leaks that already shipped, it is not a way through.
+
+  In a real emergency, and only then, skip this hook the normal git way:
+
+      git commit --no-verify
+
+  Skipping does NOT get the change onto GitHub clean. The Leak gate workflow
+  runs the same checker over the whole tree on every push and every pull
+  request. That run point cannot be skipped.
+  --------------------------------------------------------------------------
+
+MSG
+exit 1

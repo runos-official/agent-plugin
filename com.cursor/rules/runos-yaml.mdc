@@ -1,0 +1,56 @@
+---
+description: Editing a RunOS app or service configuration file. Applies to the RunOS YAML files in a workspace. Points at the topics that own the field set and the file name.
+globs: runos.yaml,runos.*.yaml,**/runos.yaml,**/runos.*.yaml
+alwaysApply: false
+---
+
+# RunOS configuration files
+
+This file declares desired state. The cluster converges on it. An edit here is a
+change to running infrastructure once it is applied.
+
+## Read these before you edit
+
+- `mcp_topics_show` with key `apps-config`. It owns the app file: every field, every
+  accepted value, and the shapes that are rejected.
+- `mcp_topics_show` with key `iac-desired-state`. It owns the reconciliation model
+  and the pull, diff, sync round trip.
+- `mcp_topics_show` with key `services-iac` when the file declares a service rather
+  than an app.
+
+You need `mcp_bootstrap` plus one `mcp_topics_show` before the read server answers
+anything else. A `mcp_topics_search` does not satisfy that gate.
+
+## Confirm the file name, do not guess it
+
+RunOS uses more than one configuration file name, and the name carries meaning.
+Check the real name and the real pattern in `apps-config` or `services-iac` before
+you create a file. A file with a name the platform does not recognise is simply not
+read, and nothing reports that.
+
+The same goes for the sidecar files that hold environment values. Read the topic.
+
+## Do not copy an old file forward
+
+An older committed file can carry a shape the platform no longer accepts. Copying it
+into a new project spreads a rejected shape. Pull the live state into a file
+instead, then edit that.
+
+## Every field comes from the topic
+
+Do not invent a field, and do not carry one over from another platform's
+configuration format. An unknown field is either refused outright or ignored
+silently, and the silent case is the one that wastes an afternoon.
+
+If you cannot fetch `apps-config`, say so and stop editing. Do not guess the schema.
+
+## An omitted field is a decision
+
+A declarative apply reconciles the whole file. Leaving a field out is not the same
+as leaving it alone, and the rule differs per field. `apps-config` and `services-iac`
+say which. Run `apps_diff` or `services_diff` and read the result before you sync.
+
+## Never put a secret in this file
+
+Credentials belong in the places the topics name, not in a file that goes into
+version control.

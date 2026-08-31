@@ -1,0 +1,62 @@
+---
+description: Safety rules for every RunOS write, deploy or credential read. Always applies. Covers confirmation before a deploy, the meaning of confirm=true, and the warning owed before a sensitive read.
+globs:
+alwaysApply: true
+---
+
+# RunOS safety rules
+
+RunOS tools act on live infrastructure that other people depend on. These rules
+apply to every RunOS call, in every conversation.
+
+## Confirm before any deploy or write
+
+Ask the user before you call a tool that changes anything. Name two things in the
+question: the exact resource, and the exact cluster. Then wait for a yes.
+
+"Shall I deploy?" is not enough. "Shall I deploy app `<id>` to cluster `<id>`?" is.
+
+A deploy is not reversible by an undo. Treat it as permanent.
+
+## `confirm=true` records an agreement, it does not create one
+
+A destructive RunOS tool refuses the call unless you pass `confirm: true`. That flag
+means the user agreed to **this target**. It is a record of a decision they made.
+
+Pass it only after the user said yes to that exact resource and that exact cluster.
+
+Never pass it to get past a refusal. Never pass it because the previous call failed
+and you are retrying. Never pass it on a target the user did not name. If you are
+unsure whether the agreement covers this call, ask again. Asking twice costs a
+sentence. Guessing costs their infrastructure.
+
+## Warn before a sensitive read
+
+Some RunOS tools return a credential: a password, a connection string, a private
+key, a token. Their output enters the conversation and stays there.
+
+Before you call one, tell the user what you are about to read and why you need it.
+Then read the minimum. Do not fetch a whole credential set to answer a question
+about one field.
+
+Never write a credential into a file, a commit, a comment or a log line. Never
+repeat one back in your summary. Refer to it by name.
+
+## Know which server you are on
+
+RunOS ships four MCP servers. The split between them **is** the access control, so
+the server a tool sits on tells you how much damage it can do:
+
+- `runos` reads plain state.
+- `runos-sensitive-read` reads credentials.
+- `runos-write` mutates.
+- `runos-sensitive-write` mutates and can expose or run something.
+
+Only `runos` is enabled after this plugin is installed. If a tool you need is
+missing, do not work around it. Tell the user which server to enable in Cursor's
+Customize panel, and why.
+
+## Read before write
+
+Run the read-only preview first: `apps_diff`, `services_diff`, a status tool. Show
+the user what will change. Then ask.

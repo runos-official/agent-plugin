@@ -1,0 +1,2 @@
+# Built by scripts/validate_manifests.py when the jsonschema library is absent.
+.venv/

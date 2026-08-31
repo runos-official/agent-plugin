@@ -1,0 +1,22 @@
+{
+  "name": "runos",
+  "version": "0.1.0",
+  "description": "RunOS platform tools, guidance and a safety gate for AI coding agents. Query and operate clusters, managed services, apps and VMs through the RunOS CLI's MCP servers.",
+  "author": {
+    "name": "RunOS"
+  },
+  "homepage": "https://runos.com",
+  "repository": "https://github.com/runos-official/agent-plugin",
+  "license": "Elastic-2.0",
+  "keywords": [
+    "runos",
+    "kubernetes",
+    "devops",
+    "deployment",
+    "infrastructure",
+    "mcp"
+  ],
+  "rules": "com.cursor/rules",
+  "commands": "com.cursor/commands",
+  "hooks": "com.cursor/hooks/hooks.json"
+}

@@ -1,0 +1,83 @@
+#!/usr/bin/env sh
+#
+# Launch the RunOS CLI's MCP server for an installed plugin.
+#
+# WHY THIS EXISTS
+# `mcp.json` cannot name an absolute path: the Agent Plugins spec allows only a
+# bare executable name or a plugin-relative "./" path, and a bare name depends
+# on the client's executable search, which the spec explicitly tells plugins
+# not to rely on. A GUI-launched editor also often starts with a login shell's
+# PATH missing, so "$HOME/.local/bin" is not searched even when the user
+# installed there. This launcher does the search itself.
+#
+# WHAT IT MUST NOT DO
+# 1. It must not print to stdout. Stdout is the MCP stdio channel. Every
+#    diagnostic here goes to stderr.
+# 2. It must not scrub the environment. RUNOS_API_KEY is the headless and
+#    background-agent authentication route, and PLUGIN_ROOT and PLUGIN_DATA are
+#    supplied by the client. `exec` inherits the whole environment, so the rule
+#    is simply: never build a new one.
+# 3. It must exec exactly ONE binary. The RunOS MCP tools are filesystem aware,
+#    so a second binary at a different version would answer from a different
+#    view of the project.
+#
+# POSIX sh on purpose: no bashisms, no arrays. macOS ships bash 3.2 and some
+# minimal images ship no bash at all.
+
+set -eu
+
+INSTALL_HINT='Install the RunOS CLI, then reload your editor:
+
+    curl -fsSL https://get.runos.com/cli.sh | bash
+
+Or point this plugin at an existing binary:
+
+    export RUNOS_BIN=/path/to/runos'
+
+# is_runnable PATH -> true when PATH is a regular file with the execute bit.
+# -x alone is not enough: a directory can carry the execute bit too.
+is_runnable() {
+  [ -f "$1" ] && [ -x "$1" ]
+}
+
+RUNOS=""
+
+# 1. $RUNOS_BIN. An explicit override is AUTHORITATIVE. When it is set and does
+#    not resolve we stop, we do not quietly fall through to another binary. A
+#    silently ignored override is the harder failure to diagnose, and it would
+#    also break the one-binary rule above.
+if [ -n "${RUNOS_BIN:-}" ]; then
+  if is_runnable "$RUNOS_BIN"; then
+    RUNOS="$RUNOS_BIN"
+  else
+    printf '%s\n' "runos-mcp: RUNOS_BIN is set to '${RUNOS_BIN}', which is not an executable file." >&2
+    printf '%s\n' "runos-mcp: refusing to fall back to another binary while RUNOS_BIN is set." >&2
+    printf '\n%s\n' "$INSTALL_HINT" >&2
+    exit 127
+  fi
+else
+  # 2. `runos` on PATH.
+  FOUND="$(command -v runos 2>/dev/null || true)"
+  if [ -n "$FOUND" ] && is_runnable "$FOUND"; then
+    RUNOS="$FOUND"
+  # 3. The default per-user install location. A GUI-launched editor usually
+  #    cannot see this on PATH, which is the whole reason for step 3 and 4.
+  elif is_runnable "${HOME:-}/.local/bin/runos"; then
+    RUNOS="${HOME}/.local/bin/runos"
+  # 4. The default system-wide install location.
+  elif is_runnable "/usr/local/bin/runos"; then
+    RUNOS="/usr/local/bin/runos"
+  fi
+fi
+
+if [ -z "$RUNOS" ]; then
+  printf '%s\n' "runos-mcp: cannot find the 'runos' binary." >&2
+  printf '%s\n' "runos-mcp: looked at \$RUNOS_BIN, PATH, \$HOME/.local/bin/runos and /usr/local/bin/runos." >&2
+  printf '\n%s\n' "$INSTALL_HINT" >&2
+  exit 127
+fi
+
+# exec, so the MCP server owns this process: one PID, stdin and stdout wired
+# straight through, signals delivered to the server and not to a shell that
+# would have to forward them. The environment is inherited untouched.
+exec "$RUNOS" "$@"
