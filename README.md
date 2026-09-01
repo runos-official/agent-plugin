@@ -15,13 +15,18 @@ installed on your machine, and that CLI holds your session.
 
 ### Cursor
 
-Point Cursor at a local checkout:
+Copy a local checkout into Cursor's plugin directory:
 
 ```bash
-ln -s "$PWD" ~/.cursor/plugins/local/runos
+rsync -a --exclude .git "$PWD"/ ~/.cursor/plugins/local/runos/
 ```
 
 Then run **Developer: Reload Window**.
+
+Cursor must own the files. It refuses a symlink whose target is outside
+`~/.cursor/plugins/local`, and it reports the refusal only in its
+`Cursor Plugins` log, so a symlinked plugin appears to install and then
+contributes nothing. Copy the checkout, and copy it again after you pull.
 
 The plugin is not published to the Cursor marketplace yet.
 

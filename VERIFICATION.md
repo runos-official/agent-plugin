@@ -287,8 +287,20 @@ reaches all five public repos.
 
 ## What has NOT been verified
 
-The verification runs headless, with no Cursor installation present, so nothing
-below has been observed in a running editor. The README says so too.
+Most of the verification runs headless. One question below has since been
+answered in a running Cursor, and it is marked as measured; the rest have not
+been observed in an editor.
+
+**Measured in Cursor 2026-09-01: the host refuses a symlinked plugin.** A
+symlink at `~/.cursor/plugins/local/<name>` whose target lies outside that
+directory is rejected with `loadUserLocalPlugin <name> rejected: symlink target
+... is outside`. The refusal appears only in the `Cursor Plugins` log, so the
+plugin looks installed and contributes nothing: no skills, no MCP server, no
+commands. A copied checkout at the same path loaded on the next
+**Developer: Reload Window** (`loaded in 24.2ms`, 0 failures). The README's
+install step was a symlink and has been corrected to a copy. What the loaded
+plugin then exposes to the agent is still unconfirmed; the load is what was
+observed.
 
 - Whether Cursor resolves a plugin hook command against the plugin root.
   `hooks.json` now names `./com.cursor/hooks/sensitive-guard.sh`, which follows
@@ -301,8 +313,9 @@ below has been observed in a running editor. The README says so too.
 - Whether a client auto-enables an MCP server it finds declared.
 - Whether Cursor picks the root `plugin.json` or `.cursor-plugin/plugin.json`
   when both are present, and whether it accepts the custom `rules`, `commands`
-  and `hooks` path keys. An earlier pass reported this as ANSWERED. It is not,
-  and it could not have been: there is no editor here to answer it.
+  and `hooks` path keys. Cursor loads the plugin without error, which proves the
+  manifest parses. It does NOT prove the custom path keys resolve, because a
+  host that ignored all three would log the same success line.
 - Whether Cursor's `.mdc` glob matcher treats `*` as crossing a dot.
 - Windows. Not supported, and `bin/runos-mcp.cmd` has been removed rather than
   shipped as a file no manifest can select.
