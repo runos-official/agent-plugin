@@ -362,12 +362,45 @@ flat=$(printf '%s' "$payload" | tr -d '\r\n' | tr ',{}[]' '\n\n\n\n\n')
 # agreeing on what counts as the field.
 K_SERVER='"[Mm][Cc][Pp]_[Ss][Ee][Rr][Vv][Ee][Rr]_[Nn][Aa][Mm][Ee]"'
 K_TOOL='"[Tt][Oo][Oo][Ll]_[Nn][Aa][Mm][Ee]"'
+# THE `-` GOES LAST IN BOTH SETS, and that is not style. A `-` in the MIDDLE of
+# a tr set is a RANGE. ' -\n' is a range from space (0x20) to newline (0x0A),
+# which runs backwards, and '_- ' is `_` (0x5F) to space (0x20), likewise. GNU tr
+# REJECTS a reverse range: it prints "range-endpoints ... are in reverse
+# collating sequence order" and outputs NOTHING. BSD tr accepts both.
+#
+# So on Linux both extractions came back EMPTY, no candidate server was found,
+# and this guard ALLOWED every payload that reached the fallback. Measured
+# 2026-09-01 in an ubuntu:24.04 container, running the very test that passes on
+# macOS: 102 checks, 9 failures, every one of them want=ask got=allow, including
+# plain write, plain sensitive-write and the documented bypass payload. A
+# security control that failed open on the platform most agents run on, while
+# its own test suite was green on the author's machine.
+SAFE_SERVER='A-Za-z0-9._/@:+ \n-'
+SAFE_TOOL='A-Za-z0-9._ \n-'
+
+# AND AN EMPTY RESULT IS NOT TAKEN ON FAITH. What made the bug above invisible
+# is that an extraction producing nothing looks exactly like a payload naming no
+# server, and the second is the common case. The awk scanner above is already
+# shape-checked for precisely this reason; tr was not. So run the sanitiser
+# against a known string first: if it cannot pass that through, it cannot see
+# anything in the payload either.
+#
+# This asks on EVERY MCP call while the toolchain is broken, including servers
+# that have nothing to do with RunOS, which the rest of this script works hard to
+# avoid. That is the deliberate trade: a guard that cannot sanitise cannot judge,
+# and a silent absent control is worse than a visible outage. It is also loud,
+# which is exactly what the failure above was not.
+if [ "$(printf 'runos-write' | tr -cd "$SAFE_SERVER" 2>/dev/null)" != 'runos-write' ] ||
+	[ "$(printf 'a_tool-name' | tr -cd "$SAFE_TOOL" 2>/dev/null)" != 'a_tool-name' ]; then
+	ask "This guard cannot sanitise the payload on this system: its own text-processing self-check failed, so it cannot tell which RunOS server this call targets. Read the tool name and the arguments before you approve."
+fi
+
 all_servers=$(printf '%s\n' "$flat" |
 	sed -n "s/.*$K_SERVER[[:space:]]*:[[:space:]]*.\{0,2\}\"\\([^\"\\\\]*\\)\".*/\\1/p" |
-	tr -cd 'A-Za-z0-9._/@:+ -\n' | sort -u)
+	tr -cd "$SAFE_SERVER" | sort -u)
 all_tools=$(printf '%s\n' "$flat" |
 	sed -n "s/.*$K_TOOL[[:space:]]*:[[:space:]]*.\{0,2\}\"\\([^\"\\\\]*\\)\".*/\\1/p" |
-	tr -cd 'A-Za-z0-9._- \n' | sort -u)
+	tr -cd "$SAFE_TOOL" | sort -u)
 
 worst=other
 for cand in $all_servers; do
