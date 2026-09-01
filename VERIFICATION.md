@@ -2,7 +2,7 @@
 
 Everything below was RUN. Nothing here is reasoned from source or from
 documentation alone. Where a figure is quoted it is a figure that reproduced on
-the machine named, and the method is given so it can be re-run.
+a stock host, and the method is given so it can be re-run.
 
 A separate section at the end lists what has NOT been verified. The README
 carries the same list, because a reader deciding whether to trust the plugin
@@ -120,13 +120,13 @@ The scanner needs `awk`. Two failure modes are tested with a stub on PATH: an
 `awk` that exits non-zero, and an `awk` that runs and prints the wrong shape.
 Both discard the scan and fall back to an awk-free, order-immune,
 most-restrictive-wins read that still returns `ask` for the bypass payload. Only
-one awk implementation was available here (one-true-awk 20200816).
+the verification covers one awk implementation (one-true-awk 20200816).
 
 ### The read server is not credential free
 
 The first version blanket-allowed `runos`, and its comment, the safety rule and
 the README all said that server returns no credential. Measured false against
-the manifest on this machine, version 44.5.0, 634 commands, 294 on `read` and 15
+CLI manifest 44.5.0: 634 commands, 294 on `read` and 15
 on `sensitive_read`. On the plain `read` tier:
 
     services/grafana/{id}/credentials      username, PASSWORD, dashboardUrl
@@ -153,8 +153,8 @@ which 7 return a real secret and 7 return only metadata or a URL. The word
 ## The sessionStart probe
 
 `make hook-test` runs 36 checks against `com.cursor/hooks/binary-check.sh`,
-each against a sandbox `HOME` and a sandbox `PATH`, so no case depends on how
-this machine is set up.
+each against a sandbox `HOME` and a sandbox `PATH`, so no case depends on the
+host's own configuration.
 
 The case that mattered: with `RUNOS_API_KEY=""` and a valid session on disk, the
 first version printed NOTHING, which its own comment called "binary present and
@@ -244,9 +244,9 @@ success instead.
                                              names the install command
 
 Branch 4, `/usr/local/bin/runos`, is NOT tested here with its real path
-constant. `/usr/local/bin` on this machine is `root:wheel drwxr-xr-x` and is not
-writable by this user, so the file cannot be placed. `.github/workflows/schema.yml`
-exercises it in CI, where the runner can write there.
+constant. On a stock macOS host `/usr/local/bin` is root-owned and not writable
+by the invoking user, so the test cannot place a file there.
+`.github/workflows/schema.yml` exercises that branch in CI, where the runner can.
 
 ## The four server names and their serve subcommands
 
@@ -287,9 +287,8 @@ reaches all five public repos.
 
 ## What has NOT been verified
 
-No Cursor GUI was available on this machine. `/Applications/Cursor.app` does not
-exist and `~/.cursor/plugins` does not exist. So nothing below has been observed
-in a real editor, and the README says so too.
+The verification runs headless, with no Cursor installation present, so nothing
+below has been observed in a running editor. The README says so too.
 
 - Whether Cursor resolves a plugin hook command against the plugin root.
   `hooks.json` now names `./com.cursor/hooks/sensitive-guard.sh`, which follows

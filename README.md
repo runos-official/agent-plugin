@@ -131,7 +131,7 @@ services/vector/{id}/credentials       clickhousePassword
 services/clickhouse/{id}/credentials   the admin and readonly passwords
 ```
 
-Verified by reading the manifest on this machine: version 44.5.0, 634 commands,
+Verified against CLI manifest 44.5.0: 634 commands,
 of which 294 are on `read` and only 15 on `sensitive_read`. Those five, plus the
 LiteLLM provider api-keys command and the MinIO get-object command, and the
 NetBird server credentials command whose declared output hid its admin password,
@@ -375,7 +375,7 @@ export RUNOS_BIN=/opt/runos/bin/runos
 ## What is still unverified
 
 Kept here rather than in a report, because a reader deciding whether to trust
-this plugin needs it. No Cursor GUI was available on the machine this was built
+this plugin needs it. The verification runs headless, with no Cursor installation present,
 and reviewed on, so nothing below has been observed in a real editor.
 
 - **Whether Cursor finds the hooks at all.** `hooks.json` names

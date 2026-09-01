@@ -193,7 +193,7 @@ asserted.
   real value inherited from the environment. The validator fails the build if
   anyone adds one.
 - `VERIFICATION.md` lists what has been measured and, at the end, what has NOT.
-  No Cursor GUI was available on the machine this was built and reviewed on, so
+  The verification runs headless, with no Cursor installation present, so
   every claim about how Cursor itself behaves is documentation-grounded and
   unobserved. An earlier pass reported one of those as answered; it was not, and
   it has been demoted.
