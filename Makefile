@@ -37,6 +37,14 @@ leakcheck-update:
 leakcheck-test:
 	@python3 scripts/leakcheck_test.py
 
+# Fail on a tracked file leakcheck cannot READ. leakcheck silently skips any
+# file holding a NUL byte or non-UTF-8 bytes, so a credential in a binary or a
+# UTF-16 file passes it with exit 0. That gap belongs to the CLI repo, which
+# owns the shared checker, so this closes it here without forking the file.
+.PHONY: unscannable
+unscannable:
+	@python3 scripts/unscannable_check.py
+
 # ============================================================================
 # Manifests
 # ============================================================================
@@ -49,11 +57,26 @@ validate:
 	@python3 scripts/validate_manifests.py
 
 # ============================================================================
+# Hooks (Cursor)
+# ============================================================================
+
+# Test the beforeMCPExecution guard. Includes every payload from the review
+# that reproduced a full bypass of all three non-read servers.
+.PHONY: guard-test
+guard-test:
+	@sh com.cursor/hooks/guard_test.sh
+
+# Test the sessionStart probe against a sandbox HOME and PATH.
+.PHONY: hook-test
+hook-test:
+	@sh com.cursor/hooks/binary_check_test.sh
+
+# ============================================================================
 # Everything a push must pass
 # ============================================================================
 
 .PHONY: check
-check: leakcheck leakcheck-test validate
+check: leakcheck unscannable leakcheck-test validate guard-test hook-test
 
 .PHONY: help
 help:
@@ -64,6 +87,10 @@ help:
 	@echo "  make leakcheck-staged Scan only the staged diff"
 	@echo "  make leakcheck-update Ratchet the baseline down after removing an identifier"
 	@echo "  make leakcheck-test   Test the leak checker itself"
+	@echo "  make unscannable      Fail on a tracked file leakcheck cannot read"
+	@echo ""
+	@echo "  make guard-test       Test the beforeMCPExecution guard"
+	@echo "  make hook-test        Test the sessionStart probe"
 	@echo ""
 	@echo "  make validate         Validate both manifests against Agent Plugins 1.0.0"
-	@echo "  make check            leakcheck + leakcheck-test + validate"
+	@echo "  make check            everything above"

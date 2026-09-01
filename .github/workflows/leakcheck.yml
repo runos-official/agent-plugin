@@ -9,6 +9,13 @@ name: Leak gate
 # and a filtered leak gate gates nothing. This workflow therefore takes no
 # branch filter and no path filter at all.
 #
+# WHAT THIS GATE DOES NOT COVER
+# leakcheck reads a file as UTF-8 and returns None for NUL-bearing or non-UTF-8
+# content, then continues with no report. A credential in a binary or UTF-16
+# file therefore passes it with exit 0, proved end to end in this repo. The
+# scannability step below closes that here; the underlying gap is filed against
+# the RunOS CLI repo, which owns the shared checker.
+#
 # WHY THE PRE-COMMIT HOOK IS NOT ENOUGH
 # .githooks/pre-commit is opt-in per clone (`make hooks`) and skippable with
 # --no-verify, and a fresh clone has core.hooksPath unset, so it has no hook at
@@ -40,6 +47,12 @@ jobs:
       # not already recorded in scripts/leakcheck.baseline.
       - name: Scan every tracked file
         run: python3 scripts/leakcheck.py
+
+      # leakcheck silently skips any file it cannot decode as UTF-8, so a
+      # credential in a binary or UTF-16 file passes the scan above with exit
+      # 0. This makes an unreadable tracked file a hard failure instead.
+      - name: Every tracked file must be one leakcheck can read
+        run: python3 scripts/unscannable_check.py
 
       # The checker's own tests: what it must catch and what it must not.
       - name: Test the checker itself

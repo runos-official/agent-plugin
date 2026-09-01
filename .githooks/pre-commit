@@ -14,7 +14,13 @@
 #
 #   1. this hook                          opt-in, skippable, fast
 #   2. .github/workflows/leakcheck.yml    every push and every pull request,
-#                                         whole tree, cannot be skipped
+#                                         whole tree, not skippable by a
+#                                         committer
+#
+# Run point 2 is not skippable, but it is not infallible either: leakcheck reads
+# UTF-8 text and silently skips anything else, so scripts/unscannable_check.py
+# runs alongside it at both run points to make an unreadable file a hard fail
+# rather than a silent pass.
 #
 # The checker's own header names a third run point, scripts/release.sh. That
 # is the binary-shipping repos. This repo ships no binary and cuts no release
@@ -33,6 +39,19 @@ CHECKER="$REPO_ROOT/scripts/leakcheck.py"
 if ! command -v python3 >/dev/null 2>&1; then
   printf '\033[0;33m  !\033[0m pre-commit: python3 not found, leakcheck skipped. CI still runs it.\n' >&2
   exit 0
+fi
+
+# leakcheck SILENTLY SKIPS a file it cannot decode: read_text() returns None
+# for a NUL byte or non-UTF-8 bytes and scan_files() just continues. So run the
+# repo-local scannability gate FIRST, or a credential in a binary or UTF-16 file
+# walks straight past the line below with exit 0.
+UNSCANNABLE="$REPO_ROOT/scripts/unscannable_check.py"
+if [[ -f "$UNSCANNABLE" ]]; then
+  if ! OUTPUT="$(python3 "$UNSCANNABLE" 2>&1)"; then
+    printf '%s\n' "$OUTPUT" >&2
+    printf '\n  COMMIT BLOCKED: a tracked file is one leakcheck cannot read.\n\n' >&2
+    exit 1
+  fi
 fi
 
 if OUTPUT="$(python3 "$CHECKER" --staged 2>&1)"; then

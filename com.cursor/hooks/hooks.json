@@ -2,10 +2,15 @@
   "version": 1,
   "hooks": {
     "beforeMCPExecution": [
-      { "command": "./sensitive-guard.sh" }
+      {
+        "command": "./com.cursor/hooks/sensitive-guard.sh",
+        "failClosed": true
+      }
     ],
     "sessionStart": [
-      { "command": "./binary-check.sh" }
+      {
+        "command": "./com.cursor/hooks/binary-check.sh"
+      }
     ]
   }
 }

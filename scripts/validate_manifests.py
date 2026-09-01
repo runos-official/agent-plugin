@@ -26,6 +26,23 @@ These are the rules that actually bite:
     exactly that.
   * Skills live at skills/<name>/SKILL.md and are never discovered recursively.
 
+LAYER 3: the rules this plugin sets for itself, which exist because an
+adversarial review found each of them broken:
+
+  * Every hooks.json command must resolve from the PLUGIN ROOT and be
+    executable. Cursor resolves a hook command against the root, not against
+    the hooks.json directory (cursor.com/docs/hooks.md and the plugin tree in
+    cursor.com/docs/reference/plugins.md, whose hooks/hooks.json names
+    "./scripts/format-code.sh" with scripts/ at the root). The first version of
+    this plugin shipped "./sensitive-guard.sh", which resolves to
+    <plugin-root>/sensitive-guard.sh and does not exist. Both hooks would have
+    been silently dead.
+  * bin/ must contain only files that mcp.json actually names. The first
+    version shipped bin/runos-mcp.cmd, which no manifest could ever select.
+  * No shipped guidance may tell an agent to key on the string
+    "not authenticated". No RunOS MCP tool returns it. See the measured strings
+    in com.cursor/rules/runos-bootstrap.mdc.
+
 Exit codes: 0 clean, 1 findings, 2 usage or environment error.
 """
 
@@ -84,8 +101,23 @@ def ensure_jsonschema():
 
 
 def fetch(url: str):
-    with urllib.request.urlopen(url, timeout=30) as response:
-        return json.loads(response.read().decode("utf-8"))
+    """Fetch a published schema, saying so plainly when the network is the problem.
+
+    This is the one step that needs a network. Without this handler a transient
+    failure exits with an opaque code and reads like a validation failure, which
+    sends the reader looking at their manifests instead of their connection.
+    """
+    try:
+        with urllib.request.urlopen(url, timeout=30) as response:
+            return json.loads(response.read().decode("utf-8"))
+    except Exception as exc:  # noqa: BLE001 - the cause is reported, not swallowed
+        sys.stderr.write(
+            "\nvalidate: could not fetch %s\n  %s: %s\n\n"
+            "  This step needs a network. The manifests were NOT validated, which\n"
+            "  is not the same as the manifests being wrong. Retry when online.\n\n"
+            % (url, type(exc).__name__, exc)
+        )
+        sys.exit(2)
 
 
 def load(path: str):
@@ -183,6 +215,119 @@ def check_skills() -> None:
             err("skills/%s" % entry, "has no SKILL.md, so no client will discover it.")
 
 
+def check_hook_commands() -> None:
+    """Every hooks.json command resolves from the PLUGIN ROOT and is executable.
+
+    Cursor resolves a hook command against the plugin root, NOT against the
+    directory holding hooks.json. The documented plugin tree puts hooks.json at
+    hooks/hooks.json and its command at "./scripts/format-code.sh", with
+    scripts/ at the root. A command written relative to the hooks directory
+    resolves to nothing, and a hook that cannot start is silent.
+    """
+    hooks_path = ".cursor-plugin/plugin.json"
+    cursor = load(hooks_path)
+    if not cursor:
+        return
+    declared = cursor.get("hooks")
+    if not isinstance(declared, str):
+        return
+
+    hooks = load(declared)
+    if not hooks:
+        return
+
+    for event, entries in (hooks.get("hooks") or {}).items():
+        for index, entry in enumerate(entries or []):
+            label = "%s[%s][%d]" % (declared, event, index)
+            command = entry.get("command")
+            if not isinstance(command, str) or not command:
+                err(label, "has no command")
+                continue
+            if not command.startswith("./"):
+                err(
+                    label,
+                    "command %r is not plugin-root relative. Cursor resolves a "
+                    "hook command against the PLUGIN ROOT, so write it as "
+                    "./<path from the root>." % command,
+                )
+                continue
+            target = os.path.join(ROOT, command[2:])
+            if not os.path.isfile(target):
+                err(
+                    label,
+                    "command %s does not exist when resolved from the plugin "
+                    "root. The hook would silently never run." % command,
+                )
+            elif not os.access(target, os.X_OK):
+                err(label, "command %s is not executable (chmod +x it)" % command)
+
+
+def check_no_unreachable_bin(mcp) -> None:
+    """bin/ holds only files mcp.json names.
+
+    The published 1.0.0 stdio object is closed over type, command, args, env and
+    cwd, and has no per-platform command variant. So a second launcher in bin/
+    is a file no manifest can ever select. Shipping one implies support that is
+    not there.
+    """
+    bin_dir = os.path.join(ROOT, "bin")
+    if not os.path.isdir(bin_dir):
+        return
+    named = set()
+    for server in (mcp or {}).get("mcpServers", {}).values():
+        command = server.get("command", "")
+        if command.startswith("./"):
+            named.add(os.path.normpath(command[2:]))
+    for entry in sorted(os.listdir(bin_dir)):
+        rel = os.path.normpath(os.path.join("bin", entry))
+        if rel not in named:
+            err(
+                "bin/",
+                "%s is not named by any mcp.json command, so no client can "
+                "select it. Either wire it up or remove it." % entry,
+            )
+
+
+BANNED_STRINGS = {
+    "not authenticated": (
+        "No RunOS MCP tool returns this string. It is auth.ErrNotAuthenticated, "
+        "produced only on the path where the server does not start. The strings "
+        "a tool really returns are \"authentication required: run 'runos login' "
+        "first\" and a JSON envelope with statusCode 401 and error \"Invalid "
+        "token\". Measured against the live CLI."
+    ),
+}
+
+GUIDANCE_GLOBS = ("skills", "com.cursor")
+GUIDANCE_EXTS = (".md", ".mdc", ".sh")
+
+
+def check_text_contracts() -> None:
+    """No shipped guidance may name a failure string the platform never emits."""
+    targets = ["README.md"]
+    for top in GUIDANCE_GLOBS:
+        base = os.path.join(ROOT, top)
+        for dirpath, _dirnames, filenames in os.walk(base):
+            for filename in filenames:
+                if filename.endswith("_test.sh"):
+                    # A test file names the banned string on purpose, to
+                    # assert that the shipped file does NOT contain it.
+                    continue
+                if filename.endswith(GUIDANCE_EXTS):
+                    full = os.path.join(dirpath, filename)
+                    targets.append(os.path.relpath(full, ROOT))
+
+    for rel in sorted(set(targets)):
+        full = os.path.join(ROOT, rel)
+        if not os.path.isfile(full):
+            continue
+        with open(full, "r", encoding="utf-8", errors="replace") as fh:
+            for number, line in enumerate(fh, start=1):
+                for banned, why in BANNED_STRINGS.items():
+                    if banned in line:
+                        err("%s:%d" % (rel, number), "contains %r. %s" % (banned, why))
+
+
 def main() -> int:
     ensure_jsonschema()
 
@@ -196,6 +341,9 @@ def main() -> int:
 
     check_spec_rules(plugin, mcp)
     check_skills()
+    check_hook_commands()
+    check_no_unreachable_bin(mcp)
+    check_text_contracts()
 
     # The Cursor manifest has no published schema. Check only that it parses
     # and that every component path it names exists, which is the failure a
@@ -215,7 +363,7 @@ def main() -> int:
         sys.stderr.write("\n")
         return 1
 
-    print("validate: clean (Agent Plugins 1.0.0 schemas + specification rules)")
+    print("validate: clean (Agent Plugins 1.0.0 schemas, specification rules, plugin self-rules)")
     return 0
 
 

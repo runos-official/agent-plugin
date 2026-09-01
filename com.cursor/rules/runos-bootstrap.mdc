@@ -38,11 +38,31 @@ is wrong.
 
 ## When a tool refuses
 
-Read the `code` field of the error, never the prose.
+Branch on the `code` field when the error carries one. The RunOS CLI error
+envelope adds `code` only when the API sent one, so it is often absent. When
+there is no `code`, branch on `statusCode`. Read the prose last.
 
-If the refusal says `not authenticated`, tell the user to run `runos login` in their
-terminal and wait. In a headless or background agent there is no browser, so the
-route is the `RUNOS_API_KEY` environment variable instead. Do not retry.
+### The credential failures, measured against the live CLI
+
+These are the exact things the platform returns. Do not wait for any other
+wording.
+
+1. `authentication required: run 'runos login' first`. The interactive sign-in
+   is expired, revoked or absent. There is no `code` and no `statusCode` here:
+   it is a plain string, because the CLI never reached the API.
+2. `{"error": "Invalid token", "statusCode": 401}`. The API key or the token was
+   rejected. This envelope carries `statusCode` and no `code`.
+3. No RunOS tool exists at all. With no credential on the machine the RunOS MCP
+   servers exit before they speak MCP, so nothing refuses anything. This is what
+   a brand new user meets, and it looks like the plugin is broken.
+
+In all three, tell the user to run `runos login` in their terminal and reload the
+window, then wait. Do not retry. In a headless or background agent there is no
+browser, so the route is an account API key in the `RUNOS_API_KEY` environment
+variable instead. If that variable is set but EMPTY, the CLI refuses it outright
+and no server starts, so it must be unset or set to a real value.
+
+### Everything else
 
 If a tool you expect is missing, or refuses an argument the topic says it takes,
 call `manifest_update` and try once more.

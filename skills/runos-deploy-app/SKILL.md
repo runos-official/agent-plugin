@@ -11,12 +11,26 @@ It states no RunOS fact of its own. The topics are the source of truth.
 ## Before anything: the two preconditions
 
 **1. Sign-in.** This skill loads whether or not the user is signed in. Every RunOS
-MCP tool call needs a token. If a RunOS tool answers `not authenticated`, stop and
-tell the user to run `runos login` in their terminal, then wait. Do not retry the
-tool. Do not look for a credential yourself. The plugin ships none.
+MCP tool call is resolved against a credential. Recognise a credential failure by
+what the platform really returns. These strings were measured against the live
+CLI, not guessed:
 
-For a headless or background agent there is no browser, so the route is the
-`RUNOS_API_KEY` environment variable instead. Tell the user that, and stop.
+- `authentication required: run 'runos login' first`. The interactive sign-in
+  is expired, revoked or absent. This is the common one.
+- a JSON error carrying `"statusCode": 401` and `"error": "Invalid token"`. The
+  API key or the token is invalid or revoked.
+- **no RunOS tool answers at all, because none exists.** With no credential the
+  RunOS MCP servers exit before they speak MCP, so there is nothing to refuse.
+  This is the state a brand new user is in.
+
+In every one of those: stop, tell the user to run `runos login` in their terminal
+and reload the window, then wait. Do not retry the tool. Do not look for a
+credential yourself. The plugin ships none.
+
+For a headless or background agent there is no browser, so the route is an
+account API key in the `RUNOS_API_KEY` environment variable instead. Tell the
+user that, and stop. If that variable is SET but EMPTY the CLI refuses it
+outright and no server starts, so it must be unset or set to a real value.
 
 **2. The two-document gate.** The RunOS read server refuses its tools until you
 have read two documents in this session:
@@ -62,6 +76,14 @@ is the only cheap way to see what is about to change, and it costs nothing.
 the question, and wait for a yes. A destructive tool needs `confirm: true`, and you
 may only pass it after the user agreed to that exact target. Never pass it to get
 past a refusal.
+
+**Pass every path as an ABSOLUTE path.** The RunOS MCP server's working
+directory is the installed plugin folder, not the user's project, and the Agent
+Plugins specification requires that: a client MUST use the plugin root when
+`cwd` is omitted, so no `mcp.json` can point the server at the workspace. A
+relative `yaml_file`, `config` or `out` therefore resolves inside the plugin
+folder, where `apps_diff` answers "no runos*.yaml found in current directory"
+and a pull would write its output.
 
 **Never invent a config field.** Read `apps-config` and use what it lists. An
 invented field is either rejected or silently ignored, and both waste a deploy.

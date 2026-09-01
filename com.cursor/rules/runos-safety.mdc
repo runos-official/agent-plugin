@@ -44,17 +44,81 @@ repeat one back in your summary. Refer to it by name.
 
 ## Know which server you are on
 
-RunOS ships four MCP servers. The split between them **is** the access control, so
-the server a tool sits on tells you how much damage it can do:
+RunOS ships four MCP servers. The split between them is the primary access
+control, so the server a tool sits on tells you most of what it can do:
 
-- `runos` reads plain state.
-- `runos-sensitive-read` reads credentials.
+- `runos` performs no mutation.
+- `runos-sensitive-read` reads credentials, kubeconfigs and private keys.
 - `runos-write` mutates.
-- `runos-sensitive-write` mutates and can expose or run something.
+- `runos-sensitive-write` mutates AND can expose a credential or run a command
+  on a machine. This is the server that carries `deploy`, `apps_build`, `run`,
+  `nodes_join-command`, `services_postgresql_exec-sql`,
+  `services_postgresql_drop-database` and `storage-groups_wipe-device`. It is
+  the highest risk category RunOS has, and a deploy needs it.
 
-Only `runos` is enabled after this plugin is installed. If a tool you need is
-missing, do not work around it. Tell the user which server to enable in Cursor's
-Customize panel, and why.
+### The read server is not credential free
+
+Do not treat `runos` as safe to call blind. It performs no mutation, but on a
+CLI older than manifest 45.0.0 the plain read tier still returns real secrets
+for five service types:
+
+    services_grafana_credentials      the Grafana admin username and password
+    services_litellm_credentials      masterKey, uiUsername, uiPassword
+    services_langfuse_credentials     initialUserPassword, initialProjectSecretKey
+    services_vector_credentials       clickhousePassword
+    services_clickhouse_credentials   the admin and readonly passwords
+
+All eight move to `runos-sensitive-read` in manifest 45.0.0. Until the user's
+CLI is on that manifest or later, they are on the read server. Two more read
+tools also return more than plain state on every manifest:
+`services_litellm_api-keys` returns the configured AI provider keys, and
+`services_minio_get-object` returns stored object content.
+
+So apply the "warn before a sensitive read" rule above to those tools even
+though they are on the read server. Call `manifest_update` and check the
+manifest version if you need to know which side of 45.0.0 the user is on.
+
+## Which servers are actually on
+
+This plugin's `mcp.json` declares ONE server, `runos`. The other three are not
+declared, so they cannot be enabled from this plugin. A user who wants them adds
+them to their own MCP configuration, and the README says how.
+
+That is the intent, not a guarantee about your session. Check what you can
+actually see before you assume a write tool is unreachable, and tell the user
+which RunOS servers are live in this conversation. If you can see
+`runos-sensitive-write`, say so plainly: somebody added it deliberately, and it
+carries `deploy` and `storage-groups_wipe-device`.
+
+If a tool you need is missing, do not work around it. Tell the user which server
+carries it and let them decide whether to add it.
+
+## Do not rely on the confirmation prompt
+
+This plugin ships a Cursor `beforeMCPExecution` hook that returns `ask` for the
+three non-read servers and for the credential-shaped read tools listed above.
+It is a backstop, not the control. It does not run everywhere:
+
+- Cursor does not load `beforeMCPExecution` or `sessionStart` hooks in a cloud
+  agent, so neither the prompt nor the session check exists there.
+- A host that is not Cursor reads the skills and `mcp.json` and ignores
+  `com.cursor/` entirely, so it has no hook at all.
+
+Your own confirmation, asked in words and naming the resource and the cluster, is
+the control that works in every one of those places. Ask anyway. Never treat the
+absence of a prompt as the user's agreement.
+
+## Pass absolute paths
+
+The RunOS MCP server's working directory is the plugin folder, not the user's
+project. The Agent Plugins specification requires that: when `cwd` is omitted a
+client MUST use the plugin root, and `${PLUGIN_ROOT}` is the same thing, so
+there is no form of `mcp.json` that points the server at the workspace.
+
+Several RunOS tools read the filesystem. So every path argument you pass, such
+as `yaml_file`, `config` or `out`, must be an ABSOLUTE path. A relative path
+resolves inside the installed plugin folder, where `apps_diff` answers "no
+runos*.yaml found in current directory" and `apps_pull` would write its output.
 
 ## Read before write
 

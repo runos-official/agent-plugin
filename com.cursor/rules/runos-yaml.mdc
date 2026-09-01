@@ -1,6 +1,6 @@
 ---
-description: Editing a RunOS app or service configuration file. Applies to the RunOS YAML files in a workspace. Points at the topics that own the field set and the file name.
-globs: runos.yaml,runos.*.yaml,**/runos.yaml,**/runos.*.yaml
+description: Editing a RunOS app or service configuration file, or one of its environment sidecars. Applies to the RunOS YAML and .env files in a workspace. Points at the topics that own the field set and the file name.
+globs: runos.yaml,runos.*.yaml,runos.*.*.yaml,runos.*.*.*.*.yaml,runos.*.config.env,runos.*.*.config.env,.runos.*.env,.runos.*.*.env,**/runos.yaml,**/runos.*.yaml,**/runos.*.*.yaml,**/runos.*.*.*.*.yaml,**/runos.*.config.env,**/runos.*.*.config.env,**/.runos.*.env,**/.runos.*.*.env
 alwaysApply: false
 ---
 
@@ -28,7 +28,21 @@ Check the real name and the real pattern in `apps-config` or `services-iac` befo
 you create a file. A file with a name the platform does not recognise is simply not
 read, and nothing reports that.
 
-The same goes for the sidecar files that hold environment values. Read the topic.
+## The environment sidecars are the risky pair
+
+Two sidecar files carry environment values, and `apps-env` owns both. They are
+parallel and an app reads them identically, but only one of them is safe to
+commit:
+
+- the SECRET one is gitignored and mode 0600. It must never be committed, and
+  its values must never be repeated back into the conversation.
+- the plain one is committed and mode 0644. A value that belongs in a password
+  manager does not belong in it.
+
+A key may appear in only one of the two. The same key in both is refused with a
+400 by both the CLI pre-flight and the platform. Read `apps-env` for the exact
+file names, the naming rules for keys, and which value belongs where. Do not
+guess which file you are looking at from its contents.
 
 ## Do not copy an old file forward
 

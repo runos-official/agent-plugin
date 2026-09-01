@@ -39,15 +39,28 @@ jobs:
       - name: Validate the manifests
         run: python3 scripts/validate_manifests.py
 
-      # The launchers are what every MCP server in mcp.json actually starts.
+      # The launcher is what the MCP server in mcp.json actually starts.
       # A syntax error here is a plugin that installs and then does nothing.
-      - name: Check the POSIX launcher parses
-        run: sh -n bin/runos-mcp
-
-      - name: Check the launchers are executable
+      - name: Check the POSIX launcher and both hooks parse
         run: |
-          test -x bin/runos-mcp || { echo "bin/runos-mcp is not executable"; exit 1; }
-          echo "bin/runos-mcp is executable"
+          sh -n bin/runos-mcp
+          sh -n com.cursor/hooks/sensitive-guard.sh
+          sh -n com.cursor/hooks/binary-check.sh
+
+      - name: Check the launcher and hooks are executable
+        run: |
+          for f in bin/runos-mcp com.cursor/hooks/sensitive-guard.sh com.cursor/hooks/binary-check.sh; do
+            test -x "$f" || { echo "$f is not executable"; exit 1; }
+          done
+          echo "the launcher and both hooks are executable"
+
+      # The guard decides a permission. Its tests carry every payload from the
+      # review that reproduced a full bypass of all three non-read servers.
+      - name: Test the beforeMCPExecution guard
+        run: sh com.cursor/hooks/guard_test.sh
+
+      - name: Test the sessionStart probe
+        run: sh com.cursor/hooks/binary_check_test.sh
 
       # A plugin-relative command must resolve for a user who never had the
       # RunOS CLI on PATH. Proves the launcher reports a real install command
@@ -62,3 +75,18 @@ jobs:
           test "$CODE" -ne 0 || { echo "expected a non-zero exit"; exit 1; }
           echo "$OUT" | grep -q "get.runos.com" || { echo "stderr did not name the install command"; exit 1; }
           echo "launcher failed correctly with exit $CODE"
+
+      # Resolution branch 4, /usr/local/bin/runos, with its REAL path constant.
+      # It cannot be exercised on a developer machine where /usr/local/bin is
+      # root-owned, so it is tested here, where the runner has sudo. Without
+      # this step the branch ships never having run.
+      - name: Resolution branch 4 (/usr/local/bin) with the real path
+        run: |
+          set -e
+          printf '#!/bin/sh\necho BRANCH4 "$@"\n' | sudo tee /usr/local/bin/runos >/dev/null
+          sudo chmod +x /usr/local/bin/runos
+          OUT="$(env -u RUNOS_BIN PATH=/usr/bin:/bin HOME="$(mktemp -d)" ./bin/runos-mcp mcp serve read)"
+          sudo rm -f /usr/local/bin/runos
+          echo "$OUT"
+          test "$OUT" = "BRANCH4 mcp serve read" || { echo "branch 4 did not resolve"; exit 1; }
+          echo "branch 4 resolved and exec'd with the arguments passed through"

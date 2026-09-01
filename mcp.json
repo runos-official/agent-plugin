@@ -6,24 +6,6 @@
       "command": "./bin/runos-mcp",
       "args": ["mcp", "serve", "read"],
       "cwd": "${PLUGIN_ROOT}"
-    },
-    "runos-sensitive-read": {
-      "type": "stdio",
-      "command": "./bin/runos-mcp",
-      "args": ["mcp", "serve", "sensitive-read"],
-      "cwd": "${PLUGIN_ROOT}"
-    },
-    "runos-write": {
-      "type": "stdio",
-      "command": "./bin/runos-mcp",
-      "args": ["mcp", "serve", "write"],
-      "cwd": "${PLUGIN_ROOT}"
-    },
-    "runos-sensitive-write": {
-      "type": "stdio",
-      "command": "./bin/runos-mcp",
-      "args": ["mcp", "serve", "sensitive-write"],
-      "cwd": "${PLUGIN_ROOT}"
     }
   }
 }
