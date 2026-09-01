@@ -5,6 +5,62 @@ All notable changes to the RunOS agent plugin are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the plugin uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] - 2026-09-01
+
+Everything here was found by installing the plugin in a real Cursor window and by
+four adversarial reviews of the skills. None of it was visible to the headless
+checks, which were green throughout.
+
+### Fixed
+
+- **The install instruction could never work.** The README told users to symlink
+  the checkout into `~/.cursor/plugins/local`. Cursor refuses a symlink whose
+  target is outside that directory, and reports the refusal only in its own log,
+  so the plugin looked installed and contributed nothing. The README now says to
+  copy, and says why.
+- **The plugin told users they had skipped a call they were never shown.** Cursor
+  can block a tool call before the user sees anything, and still report
+  `User chose to skip`. The skills knew the CLI refusal strings and none of the
+  host's, so the agent read a host block as a human decision. All four skills now
+  carry the host envelopes beside the CLI ones, with two rules: never say the user
+  skipped, declined or rejected anything, and never report a host failure as a
+  sign-in problem. The Cursor-only approval retry lives in `runos-safety.mdc`, not
+  in the portable skills.
+- **A public document called a credential tool safe.** `VERIFICATION.md` listed
+  `services_netbird-server_credentials` among the commands that correctly stay on
+  the read tier, "because their output is only host, port and URL fields". That
+  reader returns `adminEmail` and `adminPassword` from a Kubernetes secret. Its
+  DECLARED output named only two URLs, which is why an audit read from the manifest
+  could not see it. Eight commands return real secrets, not five, and the guard
+  script carried the correct count while the documents did not.
+- **Three of four skills ended in a tool the plugin cannot provide.** The bundle
+  declares one read-only server, but `deploy` is on `sensitive-write` and the sync
+  and add tools are on `write`. Each skill now names the missing server, and says
+  it is a missing server rather than a missing sign-in.
+- The two-document gate is per server, not per session.
+- `cli_version-check` was missing from every tool order.
+- `apps_diff` requires a pulled `yaml_file`, and no skill produced one.
+- The absolute-path trap quoted an error string that does not exist, and two
+  parameters the named tool cannot take.
+- An empty `RUNOS_ACCOUNT_ID` presents exactly like being signed out, and only
+  `RUNOS_API_KEY` was covered.
+- Corrected the published check counts, which were falsifiable in one command.
+- Removed an internal service name and internal workflow narration from
+  `VERIFICATION.md`, and matched both manifest descriptions to what actually ships.
+- The documented install command copied a local virtualenv into the plugin folder.
+
+### Known issue
+
+Cursor does not launch the plugin's MCP server. `mcp.json` uses the only form the
+Agent Plugins specification permits for a bundled executable: a `./` command with
+`cwd` set to `${PLUGIN_ROOT}`. Cursor does not expand `${PLUGIN_ROOT}` in `cwd`
+(specification 9.2), and resolves the `./` command against the open workspace
+rather than the plugin root (specification 7.2.1), so the launch fails with
+`ENOENT`. Skills, rules, commands and hooks are unaffected.
+
+Until Cursor conforms, add a user-level MCP entry naming the `runos` binary by
+absolute path. The plugin is not changed to match a non-conformant host.
+
 ## [0.1.0] - 2026-09-01
 
 ### Added
