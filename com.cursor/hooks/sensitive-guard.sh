@@ -151,6 +151,13 @@ END {
 	}
 }
 function report(d, k, v,   safe) {
+	# The KEY is folded to lower case. It used to be compared literally, so a
+	# payload spelling it any other way was read as having no mcp_server_name at
+	# all, the fallback below looked for the same literal and found nothing
+	# either, and the call was ALLOWED. Measured 2026-09-01:
+	# {"MCP_SERVER_NAME":"runos-write"} returned {"permission":"allow"}.
+	# Folding can only ADD an ask, never remove one.
+	k = tolower(k)
 	if (k != "mcp_server_name" && k != "tool_name" && k != "command") return
 	safe = v
 	gsub(/[^A-Za-z0-9._\/@:+-]/, "_", safe)
@@ -166,7 +173,14 @@ function report(d, k, v,   safe) {
 # or other. Used for both the authoritative value and every fallback candidate.
 
 classify() {
-	case "$1" in
+	# Compared in LOWER CASE. An mcp.json key is a name somebody typed, and JSON
+	# does not case fold it, so the guard has to. Measured 2026-09-01, before
+	# this line existed: RUNOS-WRITE, Runos-Write and RUNOS-SENSITIVE-WRITE
+	# reached no runos arm at all, fell through to `other` and were ALLOWED with
+	# no prompt. A comment in the RunOS CLI's own guard asserted this script
+	# already asked about RUNOS-WRITE. It did not.
+	cls_lower=$(printf '%s' "$1" | tr '[:upper:]' '[:lower:]')
+	case "$cls_lower" in
 	runos) printf 'read' ;;
 	runos-sensitive-read) printf 'sensitive-read' ;;
 	runos-write) printf 'write' ;;
@@ -177,7 +191,18 @@ classify() {
 	# runos-write and JSON says the two spellings are the same string. Anything that was
 	# escaped is therefore unknown, and unknown is never allowed.
 	escaped.*) printf 'unknown-runos' ;;
-	runos*sensitive* | runos*write*) printf 'unknown-runos' ;;
+	# `runos` does not have to be the FIRST word. These arms used to read
+	# runos*sensitive* and runos*write*, which a glob anchors at the start, so
+	# they caught runos-write-prod and missed prod-runos-write. Measured
+	# 2026-09-01: prod-runos-write and acme-runos-sensitive-write were both
+	# ALLOWED. Prefixing an account, an environment or a company onto a copied
+	# entry is as ordinary as appending one, and it gave a live write server
+	# with no prompt on any call.
+	#
+	# A name carrying `runos` but neither `write` nor `sensitive` is still
+	# somebody else's server and still allows, so this does not start prompting
+	# on unrelated MCP servers.
+	*runos*sensitive* | *runos*write*) printf 'unknown-runos' ;;
 	*) printf 'other' ;;
 	esac
 }
@@ -331,11 +356,17 @@ fi
 # anchored, so a spoofed copy at any depth is COLLECTED rather than skipped,
 # which is the whole point of taking the most restrictive reading.
 flat=$(printf '%s' "$payload" | tr -d '\r\n' | tr ',{}[]' '\n\n\n\n\n')
+# The two key names are spelled as character classes so the match is case
+# insensitive here as well. sed has no portable case-insensitive flag, and the
+# scanner above already folds its keys, so this keeps the two run points
+# agreeing on what counts as the field.
+K_SERVER='"[Mm][Cc][Pp]_[Ss][Ee][Rr][Vv][Ee][Rr]_[Nn][Aa][Mm][Ee]"'
+K_TOOL='"[Tt][Oo][Oo][Ll]_[Nn][Aa][Mm][Ee]"'
 all_servers=$(printf '%s\n' "$flat" |
-	sed -n 's/.*"mcp_server_name"[[:space:]]*:[[:space:]]*.\{0,2\}"\([^"\\]*\)".*/\1/p' |
+	sed -n "s/.*$K_SERVER[[:space:]]*:[[:space:]]*.\{0,2\}\"\\([^\"\\\\]*\\)\".*/\\1/p" |
 	tr -cd 'A-Za-z0-9._/@:+ -\n' | sort -u)
 all_tools=$(printf '%s\n' "$flat" |
-	sed -n 's/.*"tool_name"[[:space:]]*:[[:space:]]*.\{0,2\}"\([^"\\]*\)".*/\1/p' |
+	sed -n "s/.*$K_TOOL[[:space:]]*:[[:space:]]*.\{0,2\}\"\\([^\"\\\\]*\\)\".*/\\1/p" |
 	tr -cd 'A-Za-z0-9._- \n' | sort -u)
 
 worst=other

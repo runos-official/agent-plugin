@@ -169,6 +169,89 @@ check ask "escaped READ server name is unknown, so it asks" "$ESC_READ"
 check allow "the unescaped read server still allows, no regression" '{"mcp_server_name":"runos"}'
 check ask "the unescaped write server still asks, no regression" '{"mcp_server_name":"runos-write"}'
 
+# ---------------------------------------------------------------------------
+# THE SERVER NAME IS COMPARED IN LOWER CASE.
+#
+# Found 2026-09-01 re-verifying the earlier bypass verdict. classify() matched
+# the name literally, so an mcp.json key typed in capitals never reached any
+# runos arm and fell through to `other`, which ALLOWS. Measured against this
+# script: RUNOS-WRITE, Runos-Write and RUNOS-SENSITIVE-WRITE all returned
+# {"permission":"allow"} with no prompt.
+#
+# It also made a comment in the RunOS CLI wrong. cmd/mcp_cursor_guard.go said
+# this script "already answered ask to all five" of a list that includes
+# RUNOS-WRITE. It did not. It allowed it.
+#
+# An mcp.json key is a name somebody typed. JSON does not case fold it, so the
+# guard has to.
+check ask "the write server in capitals" '{"tool_name":"t","mcp_server_name":"RUNOS-WRITE"}'
+check ask "the write server in title case" '{"tool_name":"t","mcp_server_name":"Runos-Write"}'
+check ask "the sensitive-write server in capitals" \
+	'{"tool_name":"t","mcp_server_name":"RUNOS-SENSITIVE-WRITE"}'
+check ask "the sensitive-read server in capitals" \
+	'{"tool_name":"t","mcp_server_name":"RUNOS-SENSITIVE-READ"}'
+check ask "a mixed case unknown RunOS write server" \
+	'{"tool_name":"t","mcp_server_name":"RunOS-Write-Prod"}'
+check allow "the read server in capitals is still just the read server" \
+	'{"tool_name":"clusters_list","mcp_server_name":"RUNOS"}'
+check ask "the read server in capitals still checks the tool name" \
+	'{"tool_name":"services_grafana_credentials","mcp_server_name":"RUNOS"}'
+
+# ---------------------------------------------------------------------------
+# "runos" DOES NOT HAVE TO BE THE FIRST WORD OF THE NAME.
+#
+# Found 2026-09-01 re-verifying the earlier bypass verdict. The fallback arm
+# was runos*write*, which a glob anchors at the start, so it caught
+# runos-write-prod and missed prod-runos-write. Measured against this script:
+# prod-runos-write and acme-runos-sensitive-write both returned
+# {"permission":"allow"} with no prompt.
+#
+# This is the same class as the runos-write-prod bypass that was already fixed.
+# That fix only covered the suffix direction. Prefixing an account, an
+# environment or a company onto a copied entry is at least as ordinary a thing
+# to do as appending one, and it gave a fully live write server with no prompt
+# on any call.
+check ask "a write server with the account prefixed" \
+	'{"tool_name":"t","mcp_server_name":"prod-runos-write"}'
+check ask "a sensitive-write server with a company prefixed" \
+	'{"tool_name":"t","mcp_server_name":"acme-runos-sensitive-write"}'
+check ask "runos in the middle, capitals as well" \
+	'{"tool_name":"t","mcp_server_name":"Prod-RunOS-Write"}'
+check ask "a write server with a path-like prefix" \
+	'{"tool_name":"t","mcp_server_name":"team/runos-write"}'
+
+# The other direction must not regress: a name that carries neither `write` nor
+# `sensitive` is still somebody else's server, wherever `runos` sits in it.
+check allow "runos in the middle, but nothing risky in the name" \
+	'{"tool_name":"t","mcp_server_name":"my-runos-dashboard"}'
+
+# ---------------------------------------------------------------------------
+# THE FIELD NAME IS ALSO COMPARED IN LOWER CASE.
+#
+# Found 2026-09-01. The scanner compared the KEY literally, and so did the
+# fallback's sed, so a payload spelling the key in any other case was read as
+# having no mcp_server_name at all. The fallback then found nothing either,
+# because it looked for the same literal, and the call was ALLOWED. Measured:
+# {"MCP_SERVER_NAME":"runos-write"} returned {"permission":"allow"}.
+#
+# This is the same class the RunOS CLI guard already fixed on its side, where a
+# case-variant key downgraded ask to allow through Go's case-insensitive field
+# matching. Cursor sends the key in lower case, so this is not a shape a host
+# produces today. The guard still must not decide a payload it misread.
+#
+# Case folding the key can only ADD an ask. It can never turn one into an
+# allow, so it cannot start waving anything through.
+check ask "a write server behind an upper-case key" '{"MCP_SERVER_NAME":"runos-write"}'
+check ask "a write server behind a mixed-case key" '{"Mcp_Server_Name":"runos-write"}'
+check ask "a sensitive-write server behind an upper-case key" \
+	'{"MCP_SERVER_NAME":"runos-sensitive-write"}'
+check ask "an upper-case key nested in tool_input is still only a decoy" \
+	'{"tool_input":{"MCP_SERVER_NAME":"runos"},"mcp_server_name":"runos-write"}'
+check allow "an upper-case key naming the read server still allows" \
+	'{"MCP_SERVER_NAME":"runos","tool_name":"clusters_list"}'
+check allow "an unrelated server behind an upper-case key still allows" \
+	'{"MCP_SERVER_NAME":"linear","tool_name":"create_issue"}'
+
 check ask "no top-level server name, but a nested runos-write appears" \
 	'{"tool_name":"t","tool_input":{"mcp_server_name":"runos-write"}}'
 check allow "no top-level server name, only a nested plain read" \
