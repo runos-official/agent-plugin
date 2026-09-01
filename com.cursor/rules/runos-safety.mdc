@@ -59,20 +59,28 @@ control, so the server a tool sits on tells you most of what it can do:
 ### The read server is not credential free
 
 Do not treat `runos` as safe to call blind. It performs no mutation, but on a
-CLI older than manifest 45.0.0 the plain read tier still returns real secrets
-for five service types:
+CLI older than CLI tool manifest 45.0.0 the plain read tier still returns real
+secrets for eight commands:
 
-    services_grafana_credentials      the Grafana admin username and password
-    services_litellm_credentials      masterKey, uiUsername, uiPassword
-    services_langfuse_credentials     initialUserPassword, initialProjectSecretKey
-    services_vector_credentials       clickhousePassword
-    services_clickhouse_credentials   the admin and readonly passwords
+    services_grafana_credentials          Grafana admin username and password
+    services_litellm_credentials          masterKey, uiUsername, uiPassword
+    services_langfuse_credentials         initialUserPassword, project secret key
+    services_vector_credentials           clickhousePassword
+    services_clickhouse_credentials       admin and readonly passwords
+    services_litellm_api-keys             the configured AI provider keys
+    services_minio_get-object             stored object content
+    services_netbird-server_credentials   adminEmail and adminPassword
 
-All eight move to `runos-sensitive-read` in manifest 45.0.0. Until the user's
-CLI is on that manifest or later, they are on the read server. Two more read
-tools also return more than plain state on every manifest:
-`services_litellm_api-keys` returns the configured AI provider keys, and
-`services_minio_get-object` returns stored object content.
+All eight are `sensitive_read` from CLI tool manifest 45.0.0 onward. Until the
+user's CLI is on that manifest or later, all eight are on the read server.
+
+The NetBird one is the reason this list is written out rather than derived. Its
+declared output named only two URLs, so an audit read from the manifest could
+not see the password at all.
+
+Two `credentials` commands correctly stay on `read`, because their output really
+is host, port and URL only: `services_prometheus_credentials` and
+`services_traefik_credentials`.
 
 So apply the "warn before a sensitive read" rule above to those tools even
 though they are on the read server. Call `manifest_update` and check the
@@ -96,7 +104,9 @@ carries it and let them decide whether to add it.
 ## Do not rely on the confirmation prompt
 
 This plugin ships a Cursor `beforeMCPExecution` hook that returns `ask` for the
-three non-read servers and for the credential-shaped read tools listed above.
+three non-read servers, and for any read tool whose NAME looks credential shaped.
+The hook matches on the name, not on the list above, so it also prompts for tools
+that list does not name, such as `services_kafka_credentials`.
 It is a backstop, not the control. It does not run everywhere:
 
 - Cursor does not load `beforeMCPExecution` or `sessionStart` hooks in a cloud
@@ -124,3 +134,30 @@ runos*.yaml found in current directory" and `apps_pull` would write its output.
 
 Run the read-only preview first: `apps_diff`, `services_diff`, a status tool. Show
 the user what will change. Then ask.
+
+## A block is not a user decision
+
+Cursor can stop a tool call on its own, before the user sees anything. When it
+does, you are told:
+
+    Tool rejected: User rejected MCP: <tool> - User chose to skip.
+
+That string is used for more than one thing. It covers a real click on Skip, and
+it also covers an automatic block the user never saw. You cannot tell them apart,
+so you must not claim either.
+
+- Never tell the user they skipped, declined or rejected a call. Say the host
+  blocked it, and that they may not have been asked.
+- When the blocked call was an ordinary read (`mcp_bootstrap`, `mcp_topics_show`,
+  `clusters_list` and the like), this plugin's own hook returned `allow`. The
+  block did not come from RunOS.
+- Cursor exposes a native approval retry for a blocked call. Use it once, for a
+  read-only, non-credential tool only, so the user gets a real prompt they can
+  answer. If it is blocked again, stop and tell them.
+- Never use that retry to get past a block on a write or a credential read. A
+  real deny and an automatic block look identical, and you must treat the pair as
+  a deny.
+
+If the RunOS tools then disappear, or a call fails during live tool discovery,
+the server has died in this session. Say that, ask the user to reload the window,
+and stop. Do NOT report it as a sign-in problem.

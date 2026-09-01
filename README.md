@@ -18,7 +18,7 @@ installed on your machine, and that CLI holds your session.
 Copy a local checkout into Cursor's plugin directory:
 
 ```bash
-rsync -a --exclude .git "$PWD"/ ~/.cursor/plugins/local/runos/
+rsync -a --exclude .git --exclude .venv "$PWD"/ ~/.cursor/plugins/local/runos/
 ```
 
 Then run **Developer: Reload Window**.
@@ -125,31 +125,29 @@ believing it only rotates credentials has also turned on `wipe-device`.
 ### The read server is NOT credential free
 
 Do not read the table above as "the read server is safe". `runos` performs no
-mutation, but on a CLI older than manifest 45.0.0 the plain `read` tier still
-returns real secrets:
+mutation, but on a CLI older than CLI tool manifest 45.0.0 the plain `read` tier
+returns real secrets for eight commands:
 
 ```
-services/grafana/{id}/credentials      the Grafana admin username and password
-services/litellm/{id}/credentials      masterKey, uiUsername, uiPassword
-services/langfuse/{id}/credentials     initialUserPassword, initialProjectSecretKey
-services/vector/{id}/credentials       clickhousePassword
-services/clickhouse/{id}/credentials   the admin and readonly passwords
+services/grafana/{id}/credentials         Grafana admin username and password
+services/litellm/{id}/credentials         masterKey, uiUsername, uiPassword
+services/langfuse/{id}/credentials        initialUserPassword, project secret key
+services/vector/{id}/credentials          clickhousePassword
+services/clickhouse/{id}/credentials      admin and readonly passwords
+services/litellm/{id}/api-keys            the configured AI provider keys
+services/minio/{id}/get-object            stored object content
+services/netbird-server/{id}/credentials  adminEmail and adminPassword
 ```
 
-Verified against CLI manifest 44.5.0: 634 commands,
-of which 294 are on `read` and only 15 on `sensitive_read`. Those five, plus the
-LiteLLM provider api-keys command and the MinIO get-object command, and the
-NetBird server credentials command whose declared output hid its admin password,
-move to
-`sensitive_read` in manifest 45.0.0, which has not shipped, so anyone on a
-released CLI today still has them on the read tier.
+All eight are `sensitive_read` from CLI tool manifest 45.0.0 onward. On an older
+CLI all eight are on the read tier.
 
-Two more read-tier tools return more than plain state on every manifest:
-`services/litellm/{id}/api-keys` returns the configured AI provider keys, and
-`services/minio/{id}/get-object` returns stored object content.
+The NetBird entry is why this list is written out rather than derived from the
+manifest. Its declared output named only `managementUrl` and `dashboardUrl`, so a
+tier audit read from the manifest could not see the password at all.
 
-Three tools named `credentials` do stay on `read` correctly, because they return
-only host, port and URL fields: `prometheus`, `traefik` and `netbird-server`.
+Two commands named `credentials` correctly stay on `read`, because they return
+only host, port and URL fields: `prometheus` and `traefik`.
 
 The `beforeMCPExecution` hook therefore asks before a credential-shaped tool on
 the read server too, not only before the three non-read servers.

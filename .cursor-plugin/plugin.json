@@ -1,7 +1,7 @@
 {
   "name": "runos",
   "version": "0.1.0",
-  "description": "RunOS platform tools, guidance and a safety gate for AI coding agents. Query and operate clusters, managed services, apps and VMs through the RunOS CLI's MCP servers.",
+  "description": "Read and diagnose RunOS clusters, managed services, apps and VMs through the RunOS CLI's read-only MCP server, with skills, rules and a safety gate for the write servers you add yourself.",
   "author": {
     "name": "RunOS"
   },
@@ -18,5 +18,6 @@
   ],
   "rules": "com.cursor/rules",
   "commands": "com.cursor/commands",
-  "hooks": "com.cursor/hooks/hooks.json"
+  "hooks": "com.cursor/hooks/hooks.json",
+  "displayName": "RunOS"
 }

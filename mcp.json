@@ -4,7 +4,11 @@
     "runos": {
       "type": "stdio",
       "command": "./bin/runos-mcp",
-      "args": ["mcp", "serve", "read"],
+      "args": [
+        "mcp",
+        "serve",
+        "read"
+      ],
       "cwd": "${PLUGIN_ROOT}"
     }
   }

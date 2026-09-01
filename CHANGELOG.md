@@ -55,7 +55,7 @@ asserted.
   initial user password and project secret key, the Vector ClickHouse password,
   the ClickHouse admin and readonly passwords, the LiteLLM provider API keys and
   arbitrary MinIO object content. The first five move to `sensitive_read` in
-  manifest 45.0.0, which has not shipped, so a released CLI still has them on
+  CLI tool manifest 45.0.0, so a CLI older than that still has them on
   `read`. The guard now also asks on a credential-shaped tool name when the
   server is `runos`, and all three documents state what is true rather than what
   was assumed. That tool-name check is additive only, so it cannot go stale in

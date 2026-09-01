@@ -56,7 +56,7 @@
 #   services/minio/{id}/get-object        arbitrary stored object CONTENT
 #
 # EIGHT commands move to the sensitive_read tier in manifest
-# 45.0.0, but that has not shipped. Anyone on an older CLI still has them on the
+# 45.0.0. Anyone on an older CLI still has them on the
 # tier every agent host gets by default. So the read server gets one extra
 # check: a tool whose NAME is credential shaped is asked about, not allowed.
 #
@@ -242,7 +242,7 @@ tool_returns_secret() {
 }
 
 ask_read_credential() {
-	ask "RunOS read server, credential shaped tool: $1. The RunOS read server performs no mutation, but it is NOT credential free. On manifest 44.5.0 the plain read tier still carries the Grafana, LiteLLM, Langfuse, Vector and ClickHouse credentials commands, the LiteLLM provider api-keys command, and the MinIO get-object command, which returns stored object content. The NetBird server credentials command is an eighth: it also returns an admin password, and its declared output named only two URLs, so a tier audit read from the manifest could not see it. All eight move to the sensitive read tier in manifest 45.0.0, which has not shipped. Approve only if you want that value in this conversation."
+	ask "RunOS read server, credential shaped tool: $1. The RunOS read server performs no mutation, but it is NOT credential free. On manifest 44.5.0 the plain read tier still carries the Grafana, LiteLLM, Langfuse, Vector and ClickHouse credentials commands, the LiteLLM provider api-keys command, and the MinIO get-object command, which returns stored object content. The NetBird server credentials command is an eighth: it also returns an admin password, and its declared output named only two URLs, so a tier audit read from the manifest could not see it. All eight are sensitive read from manifest 45.0.0 onward, so an older CLI still has them here. Approve only if you want that value in this conversation."
 }
 
 # Only one awk implementation was available to test this against

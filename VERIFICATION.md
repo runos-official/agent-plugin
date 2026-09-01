@@ -78,7 +78,7 @@ SKILL.md files, two rules and two commands when it was first run.
 
 ## The beforeMCPExecution guard
 
-`make guard-test` runs 84 checks against `com.cursor/hooks/sensitive-guard.sh`.
+`make guard-test` runs 102 checks against `com.cursor/hooks/sensitive-guard.sh`.
 Every payload from the review that broke the first version is in there.
 
 The bypass, reproduced against the first version and re-run against this one:
@@ -137,10 +137,21 @@ on `sensitive_read`. On the plain `read` tier:
     services/litellm/{id}/api-keys         the configured AI provider keys
     services/minio/{id}/get-object         key, size, contentType, CONTENT
 
-Those five `credentials` commands move to `sensitive_read` in manifest 45.0.0,
-which has not shipped, so a released CLI still has them on `read` today. Three
-other `credentials` commands correctly stay on `read` because their output is
-only host, port and URL fields: `prometheus`, `traefik` and `netbird-server`.
+Those five `credentials` commands move to `sensitive_read` in CLI tool manifest
+45.0.0, so a CLI older than that still has them on `read`.
+
+CORRECTION, measured 2026-09-01 against the manifest source. An earlier version of
+this file listed `netbird-server` among the commands that correctly stay on `read`,
+"because their output is only host, port and URL fields". That was WRONG, and it
+was wrong in the dangerous direction: `services_netbird-server_credentials` returns
+`adminEmail` and `adminPassword` read from a Kubernetes secret. Its DECLARED output
+named only `managementUrl` and `dashboardUrl`, which is exactly why an audit read
+from the manifest could not see it. It is `sensitive_read` in the current manifest.
+Counting it, eight commands return real secrets, not five, and the guard script
+carried the correct count while this file did not.
+
+Only two `credentials` commands correctly stay on `read`: `prometheus` and
+`traefik`.
 
 The guard now asks on a credential-shaped tool name even when the server is
 `runos`. That check is ADDITIVE: it can turn an allow into an ask and never the
@@ -180,7 +191,7 @@ config or the environment (asserted with marker values planted in both).
 
 The skills, rules and commands name 25 documentation topic keys between them.
 Each was checked by FETCHING it with `runos mcp topics show --key <k>` against
-the live dev conductor and confirming the returned `key:` line matches. All 25
+a live RunOS deployment and confirming the returned `key:` line matches. All 25
 resolve:
 
     api-keys             apps-build-args      apps-config          apps-deploy
@@ -263,7 +274,7 @@ and all six returned the matching name.
 
 ## The leak gate, and the hole in it
 
-`make leakcheck-test` passes: 70 checks, 0 failures. A plain UTF-8 file carrying
+`make leakcheck-test` passes: 78 checks, 0 failures. A plain UTF-8 file carrying
 a credential shape is caught and the pre-commit hook blocks the commit.
 
 The hole, reproduced here: `leakcheck.py` reads a file as UTF-8 and returns
@@ -323,16 +334,15 @@ observed.
 
 ---
 
-# Independent verification by the COORDINATING agent
+# Independently re-verified checks
 
-These three checks were run by the coordinator, not by the agent that wrote the files, and not by the
-agent that later rewrote this document. They were lost once when this file was overwritten, so they are
-appended here under their own heading.
+These three checks were run separately from the work that produced the files, so each one is a second
+pass rather than a restatement.
 
 ## 1. Every documentation topic key the plugin names is real
 
-The four skills and three rules name 24 topic keys between them. Each was checked by actually FETCHING it
-with `runos mcp topics show --key <k>` against the live dev conductor, not by grepping an index. All 24
+The four skills and three rules name 25 topic keys between them. Each was checked by actually FETCHING it
+with `runos mcp topics show --key <k>` against a live RunOS deployment, not by grepping an index. All 25
 return a real topic:
 
     api-keys            apps-build-args     apps-config          apps-deploy
@@ -380,4 +390,5 @@ tool leaves it one document short, and the refusal names a requirement the agent
 does. The four are declared with `Hidden: true` in `cli/cmd/mcp.go`. Confirmed by running the server and
 getting a real MCP initialize response back with `serverInfo.name` of `runos`.
 
-Anyone auditing `mcp.json` against `--help` alone will reach the wrong conclusion. I did, briefly.
+Anyone auditing `mcp.json` against `--help` alone will reach the wrong conclusion, because the
+subcommands are hidden from the help output.
