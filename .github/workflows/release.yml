@@ -1,0 +1,62 @@
+name: Release
+
+# Tag-triggered, like every other public RunOS repo.
+#
+# WHAT A RELEASE IS HERE. This repo ships no compiled artifact: the plugin IS
+# the tree, and a host installs it by reading plugin.json. So the release
+# publishes the source archive GitHub builds from the tag, and the job's real
+# work is proving the tag is fit to publish before that happens.
+#
+# THE GATES RUN BEFORE THE RELEASE IS CREATED, not after. A release is the
+# moment the content becomes public, so a gate that runs afterwards reports on
+# something the world already has. `make check` is the same set the pre-commit
+# hook and the leakcheck workflow run, so a tag cannot carry anything a commit
+# could not.
+
+on:
+  push:
+    tags:
+      - "v*.*.*"
+
+permissions:
+  contents: read
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          # The leak gate reads history as well as the tree.
+          fetch-depth: 0
+
+      - name: Verify the plugin
+        run: make check
+
+      - name: The tag must match the version the manifest declares
+        run: |
+          tag="${GITHUB_REF_NAME#v}"
+          declared="$(python3 -c 'import json;print(json.load(open("plugin.json"))["version"])')"
+          if [ "$tag" != "$declared" ]; then
+            echo "tag v$tag does not match plugin.json version $declared" >&2
+            echo "a host reads the manifest, not the tag, so the two must agree" >&2
+            exit 1
+          fi
+          echo "tag and manifest agree on $declared"
+
+  release:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "See CHANGELOG.md for what changed in $GITHUB_REF_NAME." \
+            --verify-tag

@@ -20,7 +20,8 @@ name: Leak gate
 # .githooks/pre-commit is opt-in per clone (`make hooks`) and skippable with
 # --no-verify, and a fresh clone has core.hooksPath unset, so it has no hook at
 # all. This workflow is the only run point that sees the content before a human
-# does, and in this repo it is also the last one: there is no release script.
+# does. release.yml runs `make check` too, but a release is the moment content
+# becomes public, so that run point reports on a tag rather than guarding one.
 #
 # MODE: the whole-tree scan, the authoritative one. It reads the checked-out
 # working tree plus `git ls-files`, so the default fetch-depth of 1 is enough
