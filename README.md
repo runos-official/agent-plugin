@@ -30,37 +30,22 @@ contributes nothing. Copy the checkout, and copy it again after you pull.
 
 The plugin is not published to the Cursor marketplace yet.
 
-#### Known issue: Cursor does not launch the MCP server
+#### If Cursor shows no RunOS tools
 
-On Cursor today you get the skills, rules, commands and hooks, and **no RunOS
-tools**. The MCP server does not start.
+Cursor launches the server as the bare command `runos`, so the binary must be on
+the PATH the editor itself sees. A GUI-launched editor does not always inherit a
+login shell's PATH.
 
-`mcp.json` uses the only form the Agent Plugins specification permits for a
-bundled executable: a `./` command with `cwd` set to `${PLUGIN_ROOT}`. Cursor
-does not expand `${PLUGIN_ROOT}` in `cwd` (specification 9.2), and resolves the
-`./` command against the open workspace rather than the plugin root
-(specification 7.2.1). The launch fails with `ENOENT` either way.
+Run `command -v runos` in your terminal to find it. If that path is not visible
+to Cursor, symlink the binary somewhere that is, for example `/usr/local/bin`,
+or launch Cursor from a terminal. `RUNOS_BIN` does not help here: Cursor never
+consults it, because it spawns the bare command rather than this plugin's
+launcher.
 
-The plugin is not reshaped to match a non-conformant host. Until Cursor
-conforms, add a **user-level** MCP entry that names the `runos` binary by
-absolute path, which bypasses the plugin's own `mcp.json`:
-
-```jsonc
-// ~/.cursor/mcp.json
-{
-  "mcpServers": {
-    "runos": {
-      "command": "/absolute/path/to/runos",
-      "args": ["mcp", "serve", "read"]
-    }
-  }
-}
-```
-
-Run `command -v runos` to get the path. `runos mcp configure cursor` writes a
-project-scoped equivalent, with the sensitive-server guard attached.
-
-Every other Agent Plugins host launches the bundled server correctly.
+Cursor resolves neither a `./` command nor `${PLUGIN_ROOT}` against the plugin
+root, which is why `.cursor-plugin/plugin.json` declares its own `mcpServers`
+rather than relying on `mcp.json` discovery. The root `mcp.json` keeps the
+launcher form the Agent Plugins specification requires, for every other host.
 
 ### Any other Agent Plugins host
 

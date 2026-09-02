@@ -5,6 +5,43 @@ All notable changes to the RunOS agent plugin are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the plugin uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] - 2026-09-02
+
+The MCP server now starts in Cursor. Every earlier version shipped a server
+Cursor could never launch.
+
+### Fixed
+
+- **Cursor now gets RunOS tools. It never did before.** Measured in Cursor
+  3.18.9: `plugin-runos-runos` failed with `spawn ./bin/runos-mcp ENOENT` on
+  every attempt since the plugin existed, so a Cursor install contributed
+  skills, rules, commands and hooks and **zero tools**. Three launch forms were
+  probed side by side in one window:
+
+      command                          result
+      ./bin/runos-mcp (cwd PLUGIN_ROOT) ENOENT, 0 tools
+      ${PLUGIN_ROOT}/bin/runos-mcp      ENOENT, 0 tools, variable not expanded
+      runos                             connected, 315 tools
+
+  So Cursor expands `${PLUGIN_ROOT}` in neither `cwd` nor `command`, resolves a
+  `./` command against the workspace rather than the plugin root, and DOES see
+  the user's PATH. The last of those contradicts the assumption the launcher was
+  built on.
+
+  `.cursor-plugin/plugin.json` now declares its own `mcpServers` with the bare
+  command `runos`, which Cursor's manifest supports and which overrides
+  `mcp.json` discovery. The root `mcp.json` is unchanged and keeps the launcher
+  form the Agent Plugins specification requires, so the portable bundle is not
+  degraded to suit one host. This is the same layering already used for rules,
+  commands and hooks.
+
+### Changed
+
+- **The session-start hook no longer offers `RUNOS_BIN` as the fix on Cursor.**
+  Cursor launches the bare command, so `RUNOS_BIN` is never consulted and the
+  old advice was a dead end. It now says to put the binary on the PATH the
+  editor sees, and how. `RUNOS_BIN` still works for hosts that use the launcher.
+
 ## [0.1.2] - 2026-09-02
 
 Marketplace submission preparation. No behaviour change: no skill, rule, hook or

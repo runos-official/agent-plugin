@@ -151,7 +151,7 @@ if [ -z "$runos_bin" ] && [ "$have_creds" = "no" ]; then
 fi
 
 if [ -z "$runos_bin" ]; then
-	emit "RunOS plugin check: the runos command line tool is NOT installed on this machine, or it is not on the PATH this editor sees.\\n\\nEvery RunOS MCP server is launched from that binary, so every RunOS tool in this session will fail. Tell the user to install the RunOS CLI in their terminal and then reload the window:\\n\\n$INSTALL\\n\\nIf it IS installed but only on a login shell PATH, they can set RUNOS_BIN to its full path instead. Running 'command -v runos' in their own terminal prints that path.\\n\\nDo not call a RunOS tool until they confirm. The RunOS skills and rules in this plugin still apply, so you can keep helping with anything that does not need a tool call."
+	emit "RunOS plugin check: the runos command line tool is NOT installed on this machine, or it is not on the PATH this editor sees.\\n\\nEvery RunOS MCP server is launched from that binary, so every RunOS tool in this session will fail. Tell the user to install the RunOS CLI in their terminal and then reload the window:\\n\\n$INSTALL\\n\\nIf it IS installed but only on a login shell PATH, this editor cannot see it. Cursor launches the server as the bare command 'runos', so RUNOS_BIN does NOT help here. They must put it on the PATH the editor sees, for example by symlinking it into /usr/local/bin, or by launching Cursor from a terminal. Running 'command -v runos' in their own terminal prints its current path.\\n\\nDo not call a RunOS tool until they confirm. The RunOS skills and rules in this plugin still apply, so you can keep helping with anything that does not need a tool call."
 fi
 
 if [ "$have_creds" = "no" ]; then

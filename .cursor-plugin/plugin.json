@@ -1,6 +1,6 @@
 {
   "name": "runos",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Read and diagnose RunOS clusters, managed services, apps and VMs through the RunOS CLI's read-only MCP server, with skills, rules and a safety gate for the write servers you add yourself.",
   "logo": "assets/logo.svg",
   "author": {
@@ -20,5 +20,16 @@
   "rules": "com.cursor/rules",
   "commands": "com.cursor/commands",
   "hooks": "com.cursor/hooks/hooks.json",
+  "mcpServers": {
+    "runos": {
+      "type": "stdio",
+      "command": "runos",
+      "args": [
+        "mcp",
+        "serve",
+        "read"
+      ]
+    }
+  },
   "displayName": "RunOS"
 }
