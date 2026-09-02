@@ -5,6 +5,34 @@ All notable changes to the RunOS agent plugin are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the plugin uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.4] - 2026-09-02
+
+### Changed
+
+- **All four MCP servers are now declared, so the other three can be switched on
+  from the interface.** Only `read` was declared, which meant reaching
+  `sensitive-read`, `write` or `sensitive-write` required hand-editing JSON.
+  Cursor offers no way to ship a server switched off: a plugin manifest has no
+  `disabled` field, and an undeclared server cannot be enabled from the UI at
+  all. So the choice was a switch the user can find, or a JSON file they have to
+  be told about. The switch wins.
+
+  Server names are `runos`, `runos-sensitive-read`, `runos-write` and
+  `runos-sensitive-write`. Those exact spellings matter: the
+  `beforeMCPExecution` guard keys on the server name, so a renamed server is a
+  server the guard cannot describe.
+
+  **What keeps this safe is not the declaration.** Every call to the three
+  non-read servers is gated by the guard, which returns `ask` and runs
+  `failClosed`. And since RunOS CLI 1.19.1 every tool carries an MCP annotation,
+  so setting **Writes** to `Don't allow` leaves the reads working and switches
+  the writes off. Before that release no tool was annotated, Cursor had to treat
+  all of them as writes, and that same setting disabled everything. Declaring
+  four servers would have been a poor trade without it.
+
+  All four together publish about 693 distinct tools. Switch off what you are
+  not using.
+
 ## [0.1.3] - 2026-09-02
 
 The MCP server now starts in Cursor. Every earlier version shipped a server

@@ -169,39 +169,34 @@ only host, port and URL fields: `prometheus` and `traefik`.
 The `beforeMCPExecution` hook therefore asks before a credential-shaped tool on
 the read server too, not only before the three non-read servers.
 
-### Adding the other three servers
+### The other three servers
 
-Add them to your own MCP configuration when you need them, and remove them
-again afterwards. Each entry is the same, with only the last argument changing:
+All four servers are declared, so all four appear in Cursor's MCP list and each
+carries its own switch. Turn `runos-sensitive-read`, `runos-write` and
+`runos-sensitive-write` on and off from **Configure** on the server, per project.
 
-```json
-{
-  "mcpServers": {
-    "runos-sensitive-read": {
-      "command": "runos",
-      "args": ["mcp", "serve", "sensitive-read"]
-    },
-    "runos-write": {
-      "command": "runos",
-      "args": ["mcp", "serve", "write"]
-    },
-    "runos-sensitive-write": {
-      "command": "runos",
-      "args": ["mcp", "serve", "sensitive-write"]
-    }
-  }
-}
-```
+They are declared rather than left out because Cursor has no way to ship a
+server switched off: a plugin manifest has no `disabled` field, and an
+undeclared server cannot be enabled from the interface at all. Leaving them out
+meant hand-editing JSON to reach them, which is worse than a switch.
 
-Keep the server names exactly as written. The safety hook keys on them, so a
-renamed server is a server the hook cannot describe.
+**Two things keep this safe, and neither is the declaration.**
 
-A GUI-launched editor frequently starts without `~/.local/bin` on `PATH`, and
-these entries name the bare `runos` rather than this plugin's launcher, which
-only resolves inside the plugin. If a server fails to start, run
-`command -v runos` in your own terminal and put that absolute path in `command`.
+First, every call to those three is gated. The `beforeMCPExecution` hook returns
+`ask`, so Cursor prompts before each one and names the risk. The hook keys on
+the server name, never on a tool list, which is why the names above must not be
+changed. It runs `failClosed`, so a broken guard denies rather than waves
+through.
 
-All six forms above were launched and returned a matching `serverInfo.name`.
+Second, the tools carry MCP annotations, so Cursor can tell a read from a write.
+Set **Writes** to `Don't allow` on any server and the reads keep working while
+the writes switch off. That is the setting to reach for if you want a read-only
+session with every server still declared. It needs RunOS CLI 1.19.1 or later;
+before that release no tool carried an annotation and the same setting disabled
+everything.
+
+All four servers together publish about 693 distinct tools. If that is more than
+you want in context, switch the ones you are not using off.
 
 ## The server's working directory is the plugin folder
 
