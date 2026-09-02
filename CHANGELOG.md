@@ -10,6 +10,14 @@ and the plugin uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Marketplace submission preparation. No behaviour change: no skill, rule, hook or
 MCP server was touched.
 
+### Changed
+
+- **Relicensed to Apache License 2.0.** Cursor requires marketplace plugins to be
+  open source, and Elastic License 2.0 is source-available rather than
+  OSI-approved. This repository carries skills, rules, manifests and launcher
+  scripts, not the RunOS product, so it is licensed separately from and more
+  permissively than what it talks to.
+
 ### Added
 
 - **A logo, so the marketplace listing has a mark.** Cursor's submission

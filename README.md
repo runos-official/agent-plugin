@@ -508,4 +508,8 @@ plus both hook test suites.
 
 ## License
 
-Elastic License 2.0. See [LICENSE](LICENSE).
+Apache License 2.0. See [LICENSE](LICENSE).
+
+This plugin is a bundle of skills, rules, manifests and launcher scripts. It is
+licensed separately from, and more permissively than, the RunOS product it talks
+to. Cursor requires marketplace plugins to be open source.
