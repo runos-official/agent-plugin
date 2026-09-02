@@ -30,6 +30,38 @@ contributes nothing. Copy the checkout, and copy it again after you pull.
 
 The plugin is not published to the Cursor marketplace yet.
 
+#### Known issue: Cursor does not launch the MCP server
+
+On Cursor today you get the skills, rules, commands and hooks, and **no RunOS
+tools**. The MCP server does not start.
+
+`mcp.json` uses the only form the Agent Plugins specification permits for a
+bundled executable: a `./` command with `cwd` set to `${PLUGIN_ROOT}`. Cursor
+does not expand `${PLUGIN_ROOT}` in `cwd` (specification 9.2), and resolves the
+`./` command against the open workspace rather than the plugin root
+(specification 7.2.1). The launch fails with `ENOENT` either way.
+
+The plugin is not reshaped to match a non-conformant host. Until Cursor
+conforms, add a **user-level** MCP entry that names the `runos` binary by
+absolute path, which bypasses the plugin's own `mcp.json`:
+
+```jsonc
+// ~/.cursor/mcp.json
+{
+  "mcpServers": {
+    "runos": {
+      "command": "/absolute/path/to/runos",
+      "args": ["mcp", "serve", "read"]
+    }
+  }
+}
+```
+
+Run `command -v runos` to get the path. `runos mcp configure cursor` writes a
+project-scoped equivalent, with the sensitive-server guard attached.
+
+Every other Agent Plugins host launches the bundled server correctly.
+
 ### Any other Agent Plugins host
 
 Point the host at this directory. It reads `plugin.json`, `mcp.json` and
