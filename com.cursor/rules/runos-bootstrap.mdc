@@ -1,29 +1,26 @@
 ---
-description: How to open a RunOS session. Apply before the first RunOS MCP tool call in a conversation, and whenever a RunOS tool refuses a call. Covers the bootstrap gate, the two-document gate, and the rule against answering from memory.
+description: How to open a RunOS session. Apply before the first RunOS MCP tool call in a conversation, and whenever a RunOS tool refuses a call. Covers the opening call and the rule against answering from memory.
 globs:
 alwaysApply: false
 ---
 
 # Opening a RunOS session
 
-Do these three calls before any other RunOS tool. They are cheap. Skipping them
-costs a refused call and a wasted turn.
+Call `mcp_bootstrap` once per RunOS server, before any other RunOS tool. It returns
+the operating instructions and the index of documentation topic keys.
 
-1. `mcp_bootstrap`. Call it once per RunOS server per session. It returns the
-   instructions and the index of documentation topic keys.
-2. One `mcp_topics_show`, with an exact key from that index. Pick the topic that
-   matches the task.
-3. `cli_version-check`. Tell the user if their CLI is behind.
+Then do what it says. The bootstrap is the single source of truth for the opening
+sequence, the CLI update check and how many topics to read.
 
-## Why step 2 is not optional
+## Why this file does not restate that sequence
 
-The RunOS read server refuses its tools until two documents have been read.
-`mcp_bootstrap` counts as one. Each `mcp_topics_show` counts as one.
-`mcp_topics_search` finds keys but **does not count**, so a search alone leaves you
-still gated.
+A second copy of the rules drifts from the first, and the stale copy wins the
+argument. This file used to name an exact call order and a two-document gate. Both
+changed in the bootstrap; this file did not, so agents kept obeying the dead rule.
+Read the sequence from `mcp_bootstrap` at run time, never from memory or from here.
 
-Search when you do not know the key. Then show the topic. The show is the one that
-satisfies the gate.
+Read a topic when the task needs it: `mcp_topics_search` finds a key, and
+`mcp_topics_show` reads it.
 
 ## Never state a RunOS fact from memory
 
