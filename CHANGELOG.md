@@ -5,6 +5,26 @@ All notable changes to the RunOS agent plugin are recorded here.
 The format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and the plugin uses [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] - 2026-09-02
+
+Marketplace submission preparation. No behaviour change: no skill, rule, hook or
+MCP server was touched.
+
+### Added
+
+- **A logo, so the marketplace listing has a mark.** Cursor's submission
+  checklist asks for a logo committed to the repo and referenced by a relative
+  path. `assets/logo.svg` is the RunOS glyph, lifted from the console's own
+  `RunOSLogo.svelte` and cropped to a square viewBox with the wordmark paths
+  removed, so it is the same mark the product ships rather than a redrawing. It
+  is vector, so the listing stays crisp at any tile size, and it carries a
+  transparent background so it sits on a light or a dark card.
+
+  `.cursor-plugin/plugin.json` gains `"logo": "assets/logo.svg"`. The root
+  `plugin.json` does NOT, and must not: the published Agent Plugins 1.0.0 schema
+  sets `additionalProperties: false` and permits no `logo` key, so adding one
+  there would fail `make validate` and the Manifests workflow.
+
 ## [0.1.1] - 2026-09-01
 
 Everything here was found by installing the plugin in a real Cursor window and by
